@@ -66,12 +66,10 @@ surrogate exploite.
 
 ### Prerequis
 
-FreeFEM++ doit etre installe. Sur macOS :
-
-1. Telecharger le `.dmg` depuis
-   [GitHub Releases](https://github.com/FreeFem/FreeFem-sources/releases)
-2. Installer dans `/Applications/`
-3. Installer GCC : `brew install gcc`
+FreeFEM++ doit etre installe. Voir la section
+[Installation de FreeFEM sur macOS](../README.md#installation-de-freefem-sur-macos)
+dans le README pour les instructions detaillees (telechargement,
+autorisation Gatekeeper, installation GCC).
 
 ### Configuration du chemin FreeFEM
 

@@ -40,8 +40,7 @@ notebook.py                Notebook marimo interactif (slider nu)
 
 - **Python 3.13+**
 - **[uv](https://docs.astral.sh/uv/)** (gestionnaire de paquets)
-- **FreeFEM++** -- [telecharger depuis GitHub](https://github.com/FreeFem/FreeFem-sources/releases)
-  (macOS Apple Silicon : prendre le `.dmg` correspondant a votre version de macOS)
+- **FreeFEM++** -- voir [Installation de FreeFEM sur macOS](#installation-de-freefem-sur-macos) ci-dessous
 - **GCC** (fournit `libgfortran` requise par FreeFEM) :
   ```bash
   brew install gcc
@@ -102,6 +101,61 @@ et les metriques d'erreur. Aucun test ne requiert FreeFEM.
 - **[Guide utilisateur](docs/guide.md)** -- fonctionnement detaille, physique,
   architecture, troubleshooting
 - **[Contributing](CONTRIBUTING.md)** -- environnement de dev, conventions, tests
+
+## Installation de FreeFEM sur macOS
+
+FreeFEM n'est pas sur Homebrew. L'installation sur macOS requiert
+quelques etapes manuelles pour contourner la verification Gatekeeper.
+
+### 1. Telecharger
+
+Aller sur [FreeFEM Releases](https://github.com/FreeFem/FreeFem-sources/releases)
+et telecharger le `.dmg` **Apple Silicon** correspondant a votre version
+de macOS (ex: `FreeFEM-v4.15-Apple-Silicon-15.4.dmg` pour macOS 15 Sequoia).
+
+### 2. Installer
+
+1. Ouvrir le `.dmg` telecharge
+2. Glisser l'icone FreeFem++ dans `/Applications`
+
+### 3. Autoriser l'application (Gatekeeper)
+
+FreeFEM n'est pas signe par Apple, donc macOS le bloque par defaut.
+
+```bash
+sudo xattr -rc /Applications/FreeFem++.app
+```
+
+Cela demande votre mot de passe administrateur.
+
+### 4. Premiere ouverture
+
+1. Dans `/Applications`, **clic droit** sur FreeFem++.app
+2. Maintenir la touche **Option** enfoncee et cliquer sur **Ouvrir**
+3. macOS affiche un message "l'application est corrompue" -- c'est normal
+4. Aller dans **Reglages Systeme > Confidentialite et securite**
+5. Scroller tout en bas -- un message indique que FreeFem++ a ete bloque
+6. Cliquer sur **Ouvrir quand meme**
+7. Entrer votre mot de passe quand demande
+
+Apres cette procedure, FreeFEM fonctionne normalement depuis le terminal.
+
+### 5. Installer GCC
+
+FreeFEM depend de `libgfortran` fournie par GCC :
+
+```bash
+brew install gcc
+```
+
+### 6. Verifier
+
+```bash
+/Applications/FreeFem++.app/Contents/ff-4.15.1/bin/FreeFem++ -nw -v 0 -ne stokes_cavity.edp -nu 0.1
+```
+
+Si la commande se termine sans erreur et produit un fichier
+`data/snapshots/fields_nu_0.1.csv`, l'installation est reussie.
 
 ## Licence
 
