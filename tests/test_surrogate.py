@@ -48,16 +48,18 @@ class TestComputePOD:
         assert energy > 0.999, f"Énergie mode 1 = {energy:.6f}, attendu > 99.9%"
 
     def test_reconstruction_faithful(self):
-        """Reconstruction POD avec k=10 modes sur 20 snapshots : erreur < 40%."""
+        """Reconstruction POD avec tous les modes : erreur ≈ 0 (reconstruction exacte)."""
         from train_surrogate import compute_pod
 
         rng = np.random.default_rng(0)
         snapshots = rng.random((20, 100))
-        mean, modes, coeffs, _ = compute_pod(snapshots, k=10)
+        # Avec k = N (tous les modes), reconstruction doit être exacte à la précision machine
+        k_full = snapshots.shape[0]   # 20
+        mean, modes, coeffs, _ = compute_pod(snapshots, k=k_full)
         reconstructed = coeffs @ modes + mean
 
         err = np.linalg.norm(reconstructed - snapshots) / np.linalg.norm(snapshots)
-        assert err < 0.40, f"Erreur reconstruction = {err:.4f}, attendu < 40%"
+        assert err < 1e-10, f"Erreur reconstruction exacte = {err:.2e}, attendu < 1e-10"
 
 
 class TestFitAndPredict:

@@ -8,7 +8,7 @@ Usage:
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import PolynomialFeatures, StandardScaler
+from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import Ridge
 from sklearn.pipeline import make_pipeline
 from pathlib import Path
@@ -40,8 +40,11 @@ def compute_pod(
 
 
 def make_regression_pipe(degree: int = 3, alpha: float = 1e-6):
-    """Pipeline sklearn : StandardScaler + PolynomialFeatures(degree) + Ridge(alpha)."""
-    return make_pipeline(StandardScaler(), PolynomialFeatures(degree=degree), Ridge(alpha=alpha))
+    """Pipeline sklearn : PolynomialFeatures(degree) + Ridge(alpha).
+
+    Note: Designed to regress on 1/ν features (pass 1/nu, not nu).
+    """
+    return make_pipeline(PolynomialFeatures(degree=degree), Ridge(alpha=alpha))
 
 
 def fit_surrogate(
@@ -53,10 +56,12 @@ def fit_surrogate(
     """
     Entraîne un surrogate POD + régression pour un champ donné.
 
+    Note: La régression est effectuée sur 1/ν (physique de Stokes : u ∝ 1/ν).
+
     Returns:
         mean   : (Ngrid,)
         modes  : (k, Ngrid)
-        pipe   : pipeline sklearn ajusté (ν → coefficients POD)
+        pipe   : pipeline sklearn ajusté (1/ν → coefficients POD)
         energy : fraction d'énergie POD
     """
     mean, modes, coeffs, energy = compute_pod(snapshots_train, k)
@@ -74,6 +79,8 @@ def predict_field(
     """
     Prédit le champ pour les valeurs de ν données.
 
+    Note: La régression est effectuée sur 1/ν (physique de Stokes : u ∝ 1/ν).
+
     Args:
         nu_query : (M,) ou scalaire
         mean     : (Ngrid,)
@@ -83,8 +90,8 @@ def predict_field(
     Returns:
         (M, Ngrid) champs prédits
     """
-    nu_arr = np.atleast_1d(nu_query).reshape(-1, 1)
-    coeffs_pred = pipe.predict(1.0 / nu_arr)
+    nu_inv = 1.0 / np.atleast_1d(nu_query)
+    coeffs_pred = pipe.predict(nu_inv.reshape(-1, 1))
     return coeffs_pred @ modes + mean
 
 
