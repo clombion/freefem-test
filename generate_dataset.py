@@ -15,7 +15,7 @@ N_SIM = 40
 NU_MIN = 0.005
 NU_MAX = 2.0
 DATA_DIR = Path("data/snapshots")
-FREEFEM_CMD = "FreeFem++"
+FREEFEM_CMD = "/Applications/FreeFem++.app/Contents/ff-4.15.1/bin/FreeFem++"
 
 
 def load_csv(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -57,7 +57,7 @@ def run_simulation(nu: float) -> Path:
     # Récupère le chemin exact depuis la sortie FreeFEM (évite les problèmes
     # de conversion float→string entre Python et FreeFEM, ex: 2.0 vs "2").
     for line in result.stdout.splitlines():
-        if "Exported:" in line:
+        if line.startswith("Exported:"):
             csv_path = Path(line.split("Exported:", 1)[1].strip())
             # Vérifier que le fichier existe et a le bon nombre de lignes
             # (FreeFEM échoue silencieusement si le répertoire est absent)

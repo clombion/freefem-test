@@ -7,12 +7,13 @@
 // ============================================================
 
 // --- Paramètres -----------------------------------------------
-int    N  = 40;
+include "getARGV.idp"
+int    Nn = 40;
 real   nu = getARGV("-nu", 1.0);   // viscosité via CLI, défaut = 1.0
 
 // --- Maillage -------------------------------------------------
 // Labels: 1=bas (y=0), 2=droite (x=1), 3=haut (y=1), 4=gauche (x=0)
-mesh Th = square(N, N);
+mesh Th = square(Nn, Nn);
 
 // --- Espaces éléments finis (Taylor-Hood P2/P1) ---------------
 fespace Xh(Th, [P2, P2, P1]);
