@@ -33,13 +33,18 @@ def compute_pod(
     mean = snapshots.mean(axis=0)
     U_c = snapshots - mean
     _, s, Vt = np.linalg.svd(U_c, full_matrices=False)
+    rank = Vt.shape[0]
+    if k > rank:
+        import warnings
+        warnings.warn(f"k={k} exceeds matrix rank {rank}; clamped to {rank}", stacklevel=2)
+        k = rank
     modes = Vt[:k]
     coeffs = U_c @ modes.T
     energy = float((s[:k] ** 2).sum() / (s ** 2).sum())
     return mean, modes, coeffs, energy
 
 
-def make_regression_pipe(degree: int = 3, alpha: float = 1e-6):
+def make_regression_pipe(degree: int = 3, alpha: float = 1e-3):
     """Pipeline sklearn : PolynomialFeatures(degree) + Ridge(alpha).
 
     Note: Designed to regress on 1/ν features (pass 1/nu, not nu).
