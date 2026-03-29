@@ -6,6 +6,7 @@
 #     "scikit-learn>=1.4",
 #     "scipy>=1.10",
 #     "matplotlib>=3.8",
+#     "pyodide-http>=0.2.1",
 # ]
 # ///
 
@@ -20,8 +21,45 @@ def _():
     import marimo as mo
     import numpy as np
     import matplotlib.pyplot as plt
-    from pathlib import Path
-    return Path, mo, np, plt
+    import warnings
+    from sklearn.preprocessing import PolynomialFeatures
+    from sklearn.linear_model import Ridge
+    from sklearn.pipeline import make_pipeline, Pipeline
+    from scipy.linalg import LinAlgWarning
+    return (
+        LinAlgWarning, Pipeline, PolynomialFeatures, Ridge,
+        make_pipeline, mo, np, plt, warnings,
+    )
+
+
+@app.cell(hide_code=True)
+def _(LinAlgWarning, Pipeline, PolynomialFeatures, Ridge, make_pipeline, np, warnings):
+    def compute_pod(snapshots, k=5):
+        mean = snapshots.mean(axis=0)
+        U_c = snapshots - mean
+        _, s, Vt = np.linalg.svd(U_c, full_matrices=False)
+        rank = Vt.shape[0]
+        if k > rank:
+            k = rank
+        modes = Vt[:k]
+        coeffs = U_c @ modes.T
+        denom = float((s ** 2).sum())
+        energy = float((s[:k] ** 2).sum() / denom) if denom > 0.0 else 0.0
+        return mean, modes, coeffs, energy
+
+    def fit_surrogate(nu_train, snapshots_train, k=5, degree=3):
+        mean, modes, coeffs, energy = compute_pod(snapshots_train, k)
+        pipe = make_pipeline(PolynomialFeatures(degree=degree), Ridge(alpha=0.01))
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="An ill-conditioned matrix", category=LinAlgWarning)
+            pipe.fit((1.0 / nu_train).reshape(-1, 1), coeffs)
+        return mean, modes, pipe, energy
+
+    def predict_field(nu_query, mean, modes, pipe):
+        nu_arr = np.atleast_1d(nu_query)
+        coeffs_pred = pipe.predict((1.0 / nu_arr).reshape(-1, 1))
+        return coeffs_pred @ modes + mean
+    return compute_pod, fit_surrogate, predict_field
 
 
 @app.cell(hide_code=True)
@@ -51,15 +89,19 @@ def _(mo):
 
 
 @app.cell
-def _(Path, np):
-    from train_surrogate import compute_pod, fit_surrogate, predict_field
+def _(np):
+    import io
+    import urllib.request
 
-    data = np.load(Path("data/dataset.npz"))
+    _url = "https://raw.githubusercontent.com/clombion/freefem-test/main/data/dataset.npz"
+    with urllib.request.urlopen(_url) as _resp:
+        _buf = io.BytesIO(_resp.read())
+    data = np.load(_buf)
     nu_all = data["nu_values"]
     X, Y = data["X"], data["Y"]
     UX, UY, P = data["UX"], data["UY"], data["P"]
     n_grid = int(round(len(X) ** 0.5))
-    return compute_pod, fit_surrogate, predict_field, nu_all, X, Y, UX, UY, P, n_grid
+    return nu_all, X, Y, UX, UY, P, n_grid
 
 
 @app.cell(hide_code=True)
