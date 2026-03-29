@@ -81,7 +81,7 @@ uv run python generate_dataset.py
 MPLBACKEND=Agg uv run python train_surrogate.py --k 5 --deg 3
 
 # 3. Lancer le notebook interactif
-uv run marimo run notebook.py
+uvx marimo run notebook.py
 ```
 
 Le notebook s'ouvre dans le navigateur. Deplacez le slider pour explorer

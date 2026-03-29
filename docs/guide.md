@@ -178,7 +178,7 @@ surrogate de haute fidelite.
 ## Explorer avec le notebook marimo
 
 ```bash
-uv run marimo run notebook.py
+uvx marimo run notebook.py
 ```
 
 Le notebook s'ouvre dans le navigateur (par defaut `http://localhost:2718`).
@@ -203,7 +203,7 @@ temps reel sans relancer FreeFEM.
 Pour modifier le notebook :
 
 ```bash
-uv run marimo edit notebook.py
+uvx marimo edit notebook.py
 ```
 
 ## Comment ca marche : la methode POD
