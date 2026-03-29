@@ -144,16 +144,19 @@ def plot_field_comparison(
     vmax = max(pred.max(), true.max())
 
     ax_pred, ax_true, ax_err = axes
-    ax_pred.contourf(xi, yi, pred.reshape(n, n), levels=30, vmin=vmin, vmax=vmax)
+    im_pred = ax_pred.contourf(xi, yi, pred.reshape(n, n), levels=30, vmin=vmin, vmax=vmax)
+    plt.colorbar(im_pred, ax=ax_pred, shrink=0.8)
     ax_pred.set_title(f"{field_name} prédit (ν={nu_val:.4f})")
     ax_pred.set_aspect("equal")
 
-    ax_true.contourf(xi, yi, true.reshape(n, n), levels=30, vmin=vmin, vmax=vmax)
+    im_true = ax_true.contourf(xi, yi, true.reshape(n, n), levels=30, vmin=vmin, vmax=vmax)
+    plt.colorbar(im_true, ax=ax_true, shrink=0.8)
     ax_true.set_title(f"{field_name} simulé")
     ax_true.set_aspect("equal")
 
     err = np.abs(pred - true)
-    ax_err.contourf(xi, yi, err.reshape(n, n), levels=30, cmap="hot_r")
+    im_err = ax_err.contourf(xi, yi, err.reshape(n, n), levels=30, cmap="hot_r")
+    plt.colorbar(im_err, ax=ax_err, shrink=0.8)
     ax_err.set_title(f"|erreur| max={err.max():.2e}")
     ax_err.set_aspect("equal")
 
