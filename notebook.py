@@ -6,7 +6,6 @@
 #     "scikit-learn>=1.4",
 #     "scipy>=1.10",
 #     "matplotlib>=3.8",
-#     "pyodide-http>=0.2.1",
 # ]
 # ///
 
@@ -89,14 +88,19 @@ def _(mo):
 
 
 @app.cell
-def _(np):
+async def _(np):
     import io
-    import urllib.request
 
     _url = "https://raw.githubusercontent.com/clombion/freefem-test/main/data/dataset.npz"
-    with urllib.request.urlopen(_url) as _resp:
-        _buf = io.BytesIO(_resp.read())
-    data = np.load(_buf, allow_pickle=True)
+    try:
+        from pyodide.http import pyfetch
+        _resp = await pyfetch(_url)
+        _bytes = await _resp.bytes()
+    except ImportError:
+        import urllib.request
+        with urllib.request.urlopen(_url) as _r:
+            _bytes = _r.read()
+    data = np.load(io.BytesIO(_bytes))
     nu_all = data["nu_values"]
     X, Y = data["X"], data["Y"]
     UX, UY, P = data["UX"], data["UY"], data["P"]
