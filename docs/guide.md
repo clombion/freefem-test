@@ -185,18 +185,30 @@ Le notebook s'ouvre dans le navigateur (par defaut `http://localhost:2718`).
 
 ### Ce que contient le notebook
 
-1. **Introduction** : explication du probleme physique et de l'approche
-   surrogate avec les equations
-2. **Tableau d'energie POD** : qualite de la decomposition par champ
-3. **Slider nu** : deplacez pour choisir une viscosite dans [0.005, 2.0]
-4. **Champs scalaires** : contourf de ux, uy, p pour le nu choisi
-5. **Champ de vecteurs** : fleches de vitesse sur fond colore (magnitude)
-6. **Validation** : courbe max|u| vs nu, surrogate vs simulations
-7. **Explications** : resume du pipeline POD + regression
+**Controles interactifs :**
 
-Le slider met a jour tous les graphiques instantanement (~1 ms de
-calcul). C'est le principal interet du surrogate : exploration en
-temps reel sans relancer FreeFEM.
+- **Slider nu** : viscosite cinematique dans [0.005, 2.0]
+- **Slider k** : nombre de modes POD (1 a 20) — re-entraine le surrogate en temps reel
+- **Slider degre** : degre du polynome de regression (1 a 6)
+- **Dropdown champ** : choisir ux, uy, p, ou |u| (magnitude)
+- **Dropdown colormap** : viridis, coolwarm, plasma, RdBu_r, inferno, cividis
+
+**Visualisations :**
+
+1. **Introduction** : equations de Stokes, schema de la cavite
+2. **Tableau d'energie POD** : se met a jour avec k et degre
+3. **Champ scalaire + vecteurs** : cote a cote, le champ choisi et les
+   fleches de vitesse sur fond de magnitude
+4. **Profils ligne centrale** : ux(y) a x=0.5 et uy(x) a y=0.5 — le
+   diagnostic classique de validation (comparable a Ghia et al. 1982)
+5. **Spectre POD** : valeurs singulieres et energie cumulee avec
+   marqueur rouge au k selectionne
+6. **Comparaison surrogate vs simulation** : triptyque predit / FreeFEM
+   (simulation la plus proche en nu) / erreur absolue
+7. **Validation globale** : courbe max|u| vs nu, surrogate vs simulations
+
+Tous les graphiques se mettent a jour instantanement (~1 ms de calcul)
+quand un slider ou un dropdown change.
 
 ### Mode edition
 

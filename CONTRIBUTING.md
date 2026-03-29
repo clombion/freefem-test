@@ -21,14 +21,14 @@ uv sync
 uv run pytest tests/ -v
 ```
 
-11 tests, tous en Python pur (pas besoin de FreeFEM) :
+17 tests, tous en Python pur (pas besoin de FreeFEM) :
 
 ```
-tests/test_generate.py    3 tests   load_csv : parsing, shapes, types
-tests/test_surrogate.py   8 tests   POD, regression, erreurs L2
+tests/test_generate.py    5 tests   load_csv, input vide, subprocess erreur
+tests/test_surrogate.py  12 tests   POD, regression, erreurs L2, guards input, edge cases
 ```
 
-Attendu : `11 passed` en moins de 2 secondes.
+Attendu : `17 passed` en moins de 2 secondes.
 
 ## Structure du projet
 
@@ -36,10 +36,13 @@ Attendu : `11 passed` en moins de 2 secondes.
 stokes_cavity.edp       Script FreeFEM (Stokes P2/P1, export CSV)
 generate_dataset.py     Orchestrateur : 40 appels FreeFEM → dataset.npz
 train_surrogate.py      POD + regression polynomiale + CLI + plots
-notebook.py             Notebook marimo interactif
+notebook.py             Notebook marimo interactif (sliders k/degre/nu,
+                        dropdown champ/colormap, profils ligne centrale,
+                        spectre POD, comparaison surrogate vs simulation)
 tests/
-  test_generate.py      Tests pour load_csv
-  test_surrogate.py     Tests pour compute_pod, fit_surrogate, predict_field
+  test_generate.py      Tests pour load_csv, input vide, subprocess erreur
+  test_surrogate.py     Tests pour compute_pod, fit_surrogate, predict_field,
+                        guards input (nu=0, k>rank), edge cases (zero-norm)
 data/
   snapshots/            CSVs FreeFEM (generes, non versiones)
   dataset.npz           Archive numpy consolidee (genere, non versionne)

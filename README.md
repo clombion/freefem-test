@@ -93,8 +93,9 @@ l'ecoulement a differentes viscosites.
 uv run pytest tests/ -v
 ```
 
-11 tests couvrent le parsing CSV, la decomposition POD, la regression,
-et les metriques d'erreur. Aucun test ne requiert FreeFEM.
+17 tests couvrent le parsing CSV, la decomposition POD, la regression,
+les metriques d'erreur, les guards d'input et les erreurs subprocess.
+Aucun test ne requiert FreeFEM.
 
 ## Documentation
 

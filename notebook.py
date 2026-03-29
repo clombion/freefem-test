@@ -135,7 +135,7 @@ def _(mo, nu_all):
     field_dropdown = mo.ui.dropdown(
         options={"Vitesse horizontale (ux)": "ux", "Vitesse verticale (uy)": "uy",
                  "Pression (p)": "p", "Magnitude vitesse (|u|)": "speed"},
-        value="speed",
+        value="Magnitude vitesse (|u|)",
         label="Champ à afficher",
     )
     cmap_dropdown = mo.ui.dropdown(
