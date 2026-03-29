@@ -11,6 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import Ridge
+from scipy.linalg import LinAlgWarning
 from sklearn.pipeline import make_pipeline, Pipeline
 from pathlib import Path
 
@@ -73,7 +74,12 @@ def fit_surrogate(
     """
     mean, modes, coeffs, energy = compute_pod(snapshots_train, k)
     pipe = make_regression_pipe(degree)
-    pipe.fit((1.0 / nu_train).reshape(-1, 1), coeffs)
+    # Polynomial features of 1/ν span many orders of magnitude (up to (1/ν_min)^degree),
+    # making the normal equations ill-conditioned. Ridge handles this correctly via
+    # regularization — the warning is benign.
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="An ill-conditioned matrix", category=LinAlgWarning)
+        pipe.fit((1.0 / nu_train).reshape(-1, 1), coeffs)
     return mean, modes, pipe, energy
 
 
