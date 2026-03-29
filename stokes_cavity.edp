@@ -1,0 +1,57 @@
+// ============================================================
+// Écoulement de Stokes en cavité entraînée (lid-driven cavity)
+// Formulation mixte Taylor-Hood P2/P1
+//
+// Mode batch : ν passé via -nu (ex: FreeFem++ -nw stokes_cavity.edp -nu 0.1)
+// Exporte les champs sur une grille régulière 51×51 en CSV.
+// ============================================================
+
+// --- Paramètres -----------------------------------------------
+int    N  = 40;
+real   nu = getARGV("-nu", 1.0);   // viscosité via CLI, défaut = 1.0
+
+// --- Maillage -------------------------------------------------
+// Labels: 1=bas (y=0), 2=droite (x=1), 3=haut (y=1), 4=gauche (x=0)
+mesh Th = square(N, N);
+
+// --- Espaces éléments finis (Taylor-Hood P2/P1) ---------------
+fespace Xh(Th, [P2, P2, P1]);
+Xh [ux, uy, p], [vx, vy, q];
+
+// --- Problème de Stokes ---------------------------------------
+// Forme faible : ν(∇u,∇v) − (p, div v) − (q, div u) = 0
+solve Stokes([ux, uy, p], [vx, vy, q]) =
+    int2d(Th)(
+        nu * (  dx(ux)*dx(vx) + dy(ux)*dy(vx)
+              + dx(uy)*dx(vy) + dy(uy)*dy(vy) )
+      - p * (dx(vx) + dy(vy))
+      - q * (dx(ux) + dy(uy))
+      + 1e-10 * p * q             // régularisation jauge pression
+    )
+    + on(1, ux=0, uy=0)           // bas    : no-slip
+    + on(2, ux=0, uy=0)           // droite : no-slip
+    + on(3, ux=1, uy=0)           // haut   : couvercle entraîné U=1
+    + on(4, ux=0, uy=0);          // gauche : no-slip
+
+// --- Diagnostics ----------------------------------------------
+real divL2 = int2d(Th)( (dx(ux) + dy(uy))^2 );
+cout << "nu=" << nu << "  ||div u||^2=" << divL2 << endl;
+
+// --- Export CSV sur grille régulière 51×51 --------------------
+// Évaluation directe des champs FEM en chaque point de la grille.
+// Le répertoire data/snapshots/ doit exister avant l'appel.
+{
+    string fname = "data/snapshots/fields_nu_" + nu + ".csv";
+    ofstream fout(fname);
+    fout << "x,y,ux,uy,p" << endl;
+    int Nout = 50;
+    for (int j = 0; j <= Nout; j++)
+        for (int i = 0; i <= Nout; i++) {
+            real xi = real(i) / Nout;
+            real yj = real(j) / Nout;
+            fout << xi << "," << yj << ","
+                 << ux(xi, yj) << "," << uy(xi, yj) << ","
+                 << p(xi, yj)  << endl;
+        }
+    cout << "Exported: " << fname << endl;
+}
