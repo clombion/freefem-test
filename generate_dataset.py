@@ -77,7 +77,7 @@ def run_simulation(nu: float) -> Path:
     raise FileNotFoundError(f"FreeFEM n'a pas loggé de fichier exporté pour nu={nu}")
 
 
-def generate_dataset(nu_values: np.ndarray) -> dict:
+def generate_dataset(nu_values: np.ndarray) -> dict[str, np.ndarray]:
     """
     Lance N simulations FreeFEM et consolide les résultats.
 
@@ -85,6 +85,8 @@ def generate_dataset(nu_values: np.ndarray) -> dict:
         dict avec clés: nu_values, X, Y, UX, UY, P
         Shapes : (N,), (Ngrid,), (Ngrid,), (N, Ngrid), (N, Ngrid), (N, Ngrid)
     """
+    if len(nu_values) == 0:
+        raise ValueError("nu_values must be non-empty")
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     n = len(nu_values)
 
@@ -112,7 +114,9 @@ if __name__ == "__main__":
     dataset = generate_dataset(nu_values)
 
     out = Path("data/dataset.npz")
-    np.savez(out, **dataset)
+    tmp = out.with_suffix(".npz.tmp")
+    np.savez(tmp, **dataset)
+    tmp.rename(out)
 
     print(f"\nDataset sauvé : {out}")
     print(f"  nu_values shape : {dataset['nu_values'].shape}")

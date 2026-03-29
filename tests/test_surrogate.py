@@ -61,6 +61,21 @@ class TestComputePOD:
         err = np.linalg.norm(reconstructed - snapshots) / np.linalg.norm(snapshots)
         assert err < 1e-10, f"Erreur reconstruction exacte = {err:.2e}, attendu < 1e-10"
 
+    def test_k_exceeds_rank_is_clamped(self):
+        """compute_pod clamps k to rank when k > number of snapshots."""
+        from train_surrogate import compute_pod
+        import warnings
+
+        rng = np.random.default_rng(0)
+        snapshots = rng.random((5, 100))
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            mean, modes, coeffs, energy = compute_pod(snapshots, k=20)
+        assert modes.shape[0] == 5
+        assert coeffs.shape == (5, 5)
+        assert len(w) == 1
+        assert "clamped" in str(w[0].message)
+
 
 class TestFitAndPredict:
     def test_predict_shape(self):
@@ -87,6 +102,24 @@ class TestFitAndPredict:
         err = relative_l2_error(UX_pred, UX_test)
         assert err < 0.01, f"Erreur L2 = {err*100:.3f}%, attendu < 1%"
 
+    def test_predict_scalar_nu(self):
+        """predict_field accepts a scalar nu, not just arrays."""
+        from train_surrogate import fit_surrogate, predict_field
+
+        nu, UX = make_stokes_snapshots(20, 50)
+        mean, modes, pipe, _ = fit_surrogate(nu[:15], UX[:15], k=3, degree=3)
+        pred = predict_field(0.5, mean, modes, pipe)
+        assert pred.shape == (1, 50)
+
+    def test_predict_nu_zero_raises(self):
+        """predict_field raises ValueError for nu <= 0."""
+        from train_surrogate import fit_surrogate, predict_field
+
+        nu, UX = make_stokes_snapshots(20, 50)
+        mean, modes, pipe, _ = fit_surrogate(nu[:15], UX[:15], k=3, degree=3)
+        with pytest.raises(ValueError, match="nu must be > 0"):
+            predict_field(np.array([0.0]), mean, modes, pipe)
+
 
 class TestRelativeL2Error:
     def test_identical_arrays_gives_zero(self):
@@ -103,3 +136,12 @@ class TestRelativeL2Error:
         pred = 2 * np.ones((3, 10))
         err = relative_l2_error(pred, true)
         assert err == pytest.approx(1.0)
+
+    def test_zero_norm_true_returns_finite(self):
+        """Zero-norm true vector should return finite value (1e-15 guard)."""
+        from train_surrogate import relative_l2_error
+
+        true = np.zeros((3, 10))
+        pred = np.ones((3, 10))
+        err = relative_l2_error(pred, true)
+        assert np.isfinite(err)

@@ -10,7 +10,7 @@
 
 import marimo
 
-__generated_with = "0.20.4"
+__generated_with = "0.21.1"
 app = marimo.App(width="medium")
 
 
@@ -20,52 +20,55 @@ def _():
     import numpy as np
     import matplotlib.pyplot as plt
     from pathlib import Path
-    return mo, np, plt, Path
+
+    return Path, mo, np, plt
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-# Surrogate POD — Stokes en cavité entraînée
+    # Surrogate POD — Stokes en cavité entraînée
 
-## Le problème physique
+    ## Le problème physique
 
-On simule un **écoulement de Stokes** dans un carré [0,1]×[0,1] :
-le couvercle supérieur se déplace à vitesse constante (u=1, v=0),
-toutes les autres parois sont fixes (condition de non-glissement).
+    On simule un **écoulement de Stokes** dans un carré [0,1]×[0,1] :
+    le couvercle supérieur se déplace à vitesse constante (u=1, v=0),
+    toutes les autres parois sont fixes (condition de non-glissement).
 
-C'est le problème classique de la **lid-driven cavity** — un benchmark
-fondamental en mécanique des fluides numérique.
+    C'est le problème classique de la **lid-driven cavity** — un benchmark
+    fondamental en mécanique des fluides numérique.
 
-Les équations de Stokes (régime lent, sans inertie) s'écrivent :
+    Les équations de Stokes (régime lent, sans inertie) s'écrivent :
 
-$$-\\nu \\, \\Delta \\mathbf{u} + \\nabla p = 0, \\quad \\nabla \\cdot \\mathbf{u} = 0$$
+    $$-\nu \, \Delta \mathbf{u} + \nabla p = 0, \quad \nabla \cdot \mathbf{u} = 0$$
 
-où **ν** est la viscosité cinématique et **u**, **p** sont la vitesse et la pression.
+    où **ν** est la viscosité cinématique et **u**, **p** sont la vitesse et la pression.
 
-## L'approche surrogate
+    ## L'approche surrogate
 
-Au lieu de relancer une simulation FreeFEM à chaque changement de ν,
-on construit un **modèle réduit (ROM)** :
+    Au lieu de relancer une simulation FreeFEM à chaque changement de ν,
+    on construit un **modèle réduit (ROM)** :
 
-1. **Générer un dataset** : 40 simulations FreeFEM pour ν ∈ [0.005, 2.0]
-2. **Décomposer par POD** (Proper Orthogonal Decomposition) : extraire les modes
-   dominants via SVD — quelques modes suffisent à capturer 99% de l'énergie
-3. **Régresser** : un polynôme en 1/ν prédit les coefficients POD pour tout ν
+    1. **Générer un dataset** : 40 simulations FreeFEM pour ν ∈ [0.005, 2.0]
+    2. **Décomposer par POD** (Proper Orthogonal Decomposition) : extraire les modes
+       dominants via SVD — quelques modes suffisent à capturer 99% de l'énergie
+    3. **Régresser** : un polynôme en 1/ν prédit les coefficients POD pour tout ν
 
-Résultat : la prédiction est **instantanée** (~1 ms) au lieu de ~0.1 s par simulation.
-""")
+    Résultat : la prédiction est **instantanée** (~1 ms) au lieu de ~0.1 s par simulation.
+    """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
-    mo.md("## Chargement du dataset et entraînement")
+    mo.md("""
+    ## Chargement du dataset et entraînement
+    """)
     return
 
 
 @app.cell
-def _(np, Path):
+def _(Path, np):
     from train_surrogate import fit_surrogate, predict_field
 
     data = np.load(Path("data/dataset.npz"))
@@ -73,57 +76,66 @@ def _(np, Path):
     X, Y = data["X"], data["Y"]
     UX, UY, P = data["UX"], data["UY"], data["P"]
     n_grid = int(round(len(X) ** 0.5))
-    return fit_surrogate, predict_field, nu_all, X, Y, UX, UY, P, n_grid
+    return P, UX, UY, X, Y, fit_surrogate, n_grid, nu_all, predict_field
 
 
 @app.cell
-def _(fit_surrogate, nu_all, UX, UY, P):
+def _(P, UX, UY, fit_surrogate, nu_all):
     k, degree = 5, 3
     mean_ux, modes_ux, pipe_ux, e_ux = fit_surrogate(nu_all, UX, k, degree)
     mean_uy, modes_uy, pipe_uy, e_uy = fit_surrogate(nu_all, UY, k, degree)
     mean_p, modes_p, pipe_p, e_p = fit_surrogate(nu_all, P, k, degree)
     return (
-        k, degree,
-        mean_ux, modes_ux, pipe_ux, e_ux,
-        mean_uy, modes_uy, pipe_uy, e_uy,
-        mean_p, modes_p, pipe_p, e_p,
+        e_p,
+        e_ux,
+        e_uy,
+        k,
+        mean_p,
+        mean_ux,
+        mean_uy,
+        modes_p,
+        modes_ux,
+        modes_uy,
+        pipe_p,
+        pipe_ux,
+        pipe_uy,
     )
 
 
-@app.cell
-def _(mo, e_ux, e_uy, e_p, k, nu_all):
+@app.cell(hide_code=True)
+def _(e_p, e_ux, e_uy, k, mo, nu_all):
     mo.md(f"""
-Le surrogate est entraîné sur les **{len(nu_all)} simulations** du dataset
-avec **k={k} modes POD**. La fraction d'énergie capturée par ces modes
-mesure la qualité de la décomposition (100% = reconstruction parfaite) :
+    Le surrogate est entraîné sur les **{len(nu_all)} simulations** du dataset
+    avec **k={k} modes POD**. La fraction d'énergie capturée par ces modes
+    mesure la qualité de la décomposition (100% = reconstruction parfaite) :
 
-| Champ | Description | Énergie capturée |
-|-------|-------------|-----------------|
-| ux    | Vitesse horizontale | {e_ux * 100:.2f}% |
-| uy    | Vitesse verticale   | {e_uy * 100:.2f}% |
-| p     | Pression            | {e_p * 100:.2f}% |
+    | Champ | Description | Énergie capturée |
+    |-------|-------------|-----------------|
+    | ux    | Vitesse horizontale | {e_ux * 100:.2f}% |
+    | uy    | Vitesse verticale   | {e_uy * 100:.2f}% |
+    | p     | Pression            | {e_p * 100:.2f}% |
 
-Pour Stokes, la solution varie linéairement en 1/ν — le surrogate
-capture cette structure et prédit avec une erreur quasi nulle.
-""")
+    Pour Stokes, la solution varie linéairement en 1/ν — le surrogate
+    capture cette structure et prédit avec une erreur quasi nulle.
+    """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-## Exploration interactive
+    ## Exploration interactive
 
-Déplacez le slider pour choisir une viscosité ν.
-Le surrogate prédit instantanément les champs correspondants.
+    Déplacez le slider pour choisir une viscosité ν.
+    Le surrogate prédit instantanément les champs correspondants.
 
-- **ν petit** (→ 0.005) : écoulement plus vigoureux, gradients plus forts
-- **ν grand** (→ 2.0) : écoulement amorti, champs plus lisses
-""")
+    - **ν petit** (→ 0.005) : écoulement plus vigoureux, gradients plus forts
+    - **ν grand** (→ 2.0) : écoulement amorti, champs plus lisses
+    """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, nu_all):
     nu_slider = mo.ui.slider(
         start=float(nu_all.min()),
@@ -139,40 +151,48 @@ def _(mo, nu_all):
 
 @app.cell
 def _(
-    predict_field, np, nu_slider,
-    mean_ux, modes_ux, pipe_ux,
-    mean_uy, modes_uy, pipe_uy,
-    mean_p, modes_p, pipe_p,
+    mean_p,
+    mean_ux,
+    mean_uy,
+    modes_p,
+    modes_ux,
+    modes_uy,
+    np,
+    nu_slider,
+    pipe_p,
+    pipe_ux,
+    pipe_uy,
+    predict_field,
 ):
     nu = nu_slider.value
     ux_pred = predict_field(np.array([nu]), mean_ux, modes_ux, pipe_ux)[0]
     uy_pred = predict_field(np.array([nu]), mean_uy, modes_uy, pipe_uy)[0]
     p_pred = predict_field(np.array([nu]), mean_p, modes_p, pipe_p)[0]
-    return nu, ux_pred, uy_pred, p_pred
+    return nu, p_pred, ux_pred, uy_pred
 
 
 @app.cell
-def _(mo, nu, np, ux_pred, uy_pred):
+def _(mo, np, nu, ux_pred, uy_pred):
     speed = float(np.max(np.sqrt(ux_pred**2 + uy_pred**2)))
     mo.md(f"### ν = {nu:.4f} — max |u| = {speed:.4f}")
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-### Champs scalaires
+    ### Champs scalaires
 
-De gauche à droite : vitesse horizontale (**ux**), vitesse verticale (**uy**),
-et **pression** (p). Les couleurs indiquent l'intensité — le couvercle
-entraîne le fluide vers la droite (ux ≈ 1 en haut), créant un
-tourbillon de recirculation visible sur uy.
-""")
+    De gauche à droite : vitesse horizontale (**ux**), vitesse verticale (**uy**),
+    et **pression** (p). Les couleurs indiquent l'intensité — le couvercle
+    entraîne le fluide vers la droite (ux ≈ 1 en haut), créant un
+    tourbillon de recirculation visible sur uy.
+    """)
     return
 
 
-@app.cell
-def _(plt, np, X, Y, n_grid, ux_pred, uy_pred, p_pred, nu):
+@app.cell(hide_code=True)
+def _(X, Y, n_grid, nu, p_pred, plt, ux_pred, uy_pred):
     xi = X.reshape(n_grid, n_grid)
     yi = Y.reshape(n_grid, n_grid)
 
@@ -199,21 +219,21 @@ def _(plt, np, X, Y, n_grid, ux_pred, uy_pred, p_pred, nu):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-### Champ de vecteurs
+    ### Champ de vecteurs
 
-Les flèches montrent la direction et l'intensité de l'écoulement.
-Le fond coloré indique la norme de la vitesse (magnitude).
-On observe le tourbillon principal créé par le couvercle entraîné :
-le fluide descend le long de la paroi droite et remonte par la gauche.
-""")
+    Les flèches montrent la direction et l'intensité de l'écoulement.
+    Le fond coloré indique la norme de la vitesse (magnitude).
+    On observe le tourbillon principal créé par le couvercle entraîné :
+    le fluide descend le long de la paroi droite et remonte par la gauche.
+    """)
     return
 
 
 @app.cell
-def _(plt, np, X, Y, n_grid, ux_pred, uy_pred, nu):
+def _(X, Y, n_grid, np, nu, plt, ux_pred, uy_pred):
     xi_v = X.reshape(n_grid, n_grid)
     yi_v = Y.reshape(n_grid, n_grid)
     ux_g = ux_pred.reshape(n_grid, n_grid)
@@ -239,25 +259,34 @@ def _(plt, np, X, Y, n_grid, ux_pred, uy_pred, nu):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-## Validation du surrogate
+    ## Validation du surrogate
 
-Le graphique ci-dessous compare la quantité scalaire max|u| issue des
-40 simulations FreeFEM (points bleus) avec la prédiction continue du
-surrogate (courbe orange). Pour Stokes, max|u| est constant car la
-vitesse du couvercle impose l'échelle — le surrogate reproduit cette
-propriété exactement.
-""")
+    Le graphique ci-dessous compare la quantité scalaire max|u| issue des
+    40 simulations FreeFEM (points bleus) avec la prédiction continue du
+    surrogate (courbe orange). Pour Stokes, max|u| est constant car la
+    vitesse du couvercle impose l'échelle — le surrogate reproduit cette
+    propriété exactement.
+    """)
     return
 
 
 @app.cell
 def _(
-    plt, np, predict_field, nu_all, UX, UY,
-    mean_ux, modes_ux, pipe_ux,
-    mean_uy, modes_uy, pipe_uy,
+    UX,
+    UY,
+    mean_ux,
+    mean_uy,
+    modes_ux,
+    modes_uy,
+    np,
+    nu_all,
+    pipe_ux,
+    pipe_uy,
+    plt,
+    predict_field,
 ):
     nu_sweep = np.logspace(np.log10(nu_all.min()), np.log10(nu_all.max()), 200)
     ux_sw = predict_field(nu_sweep, mean_ux, modes_ux, pipe_ux)
@@ -278,23 +307,23 @@ def _(
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md("""
----
+    ---
 
-## Comment ça marche en coulisses
+    ## Comment ça marche en coulisses
 
-1. **FreeFEM** résout les EDP de Stokes par éléments finis (Taylor-Hood P2/P1)
-   sur un maillage 40×40 pour 40 valeurs de ν log-espacées
-2. **POD** (SVD de la matrice de snapshots) extrait les k modes spatiaux
-   dominants — chaque solution se décompose en combinaison linéaire de ces modes
-3. **Régression polynomiale** en 1/ν prédit les coefficients de cette
-   décomposition pour tout ν, sans résoudre les EDP
+    1. **FreeFEM** résout les EDP de Stokes par éléments finis (Taylor-Hood P2/P1)
+       sur un maillage 40×40 pour 40 valeurs de ν log-espacées
+    2. **POD** (SVD de la matrice de snapshots) extrait les k modes spatiaux
+       dominants — chaque solution se décompose en combinaison linéaire de ces modes
+    3. **Régression polynomiale** en 1/ν prédit les coefficients de cette
+       décomposition pour tout ν, sans résoudre les EDP
 
-Le coût passe de **O(N³)** (résolution EF) à **O(k)** (produit matrice-vecteur) — un
-gain de plusieurs ordres de grandeur.
-""")
+    Le coût passe de **O(N³)** (résolution EF) à **O(k)** (produit matrice-vecteur) — un
+    gain de plusieurs ordres de grandeur.
+    """)
     return
 
 

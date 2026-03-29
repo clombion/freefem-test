@@ -1,7 +1,6 @@
 # tests/test_generate.py
 import numpy as np
 import pytest
-import os
 import tempfile
 from pathlib import Path
 
@@ -23,7 +22,7 @@ def test_load_csv_parses_columns():
         assert UY[1] == pytest.approx(0.4)
         assert P[0] == pytest.approx(0.5)
     finally:
-        os.unlink(tmp)
+        tmp.unlink(missing_ok=True)
 
 
 def test_load_csv_grid_size_2601():
@@ -44,7 +43,7 @@ def test_load_csv_grid_size_2601():
         assert len(X) == 2601
         assert len(UX) == 2601
     finally:
-        os.unlink(tmp)
+        tmp.unlink(missing_ok=True)
 
 
 def test_load_csv_returns_numpy_arrays():
@@ -60,4 +59,26 @@ def test_load_csv_returns_numpy_arrays():
         for arr in result:
             assert isinstance(arr, np.ndarray)
     finally:
-        os.unlink(tmp)
+        tmp.unlink(missing_ok=True)
+
+
+def test_generate_dataset_empty_raises():
+    """generate_dataset raises ValueError for empty nu_values."""
+    from generate_dataset import generate_dataset
+
+    with pytest.raises(ValueError, match="non-empty"):
+        generate_dataset(np.array([]))
+
+
+def test_run_simulation_bad_binary_raises():
+    """run_simulation raises RuntimeError when FreeFEM binary doesn't exist."""
+    from generate_dataset import run_simulation
+    import generate_dataset as gd
+
+    original = gd.FREEFEM_CMD
+    gd.FREEFEM_CMD = "/nonexistent/binary"
+    try:
+        with pytest.raises((RuntimeError, FileNotFoundError)):
+            run_simulation(0.1)
+    finally:
+        gd.FREEFEM_CMD = original

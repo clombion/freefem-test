@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import Ridge
-from sklearn.pipeline import make_pipeline
+from sklearn.pipeline import make_pipeline, Pipeline
 from pathlib import Path
 
 
@@ -45,7 +45,7 @@ def compute_pod(
     return mean, modes, coeffs, energy
 
 
-def make_regression_pipe(degree: int = 3, alpha: float = 0.01):
+def make_regression_pipe(degree: int = 3, alpha: float = 0.01) -> Pipeline:
     """Pipeline sklearn : PolynomialFeatures(degree) + Ridge(alpha).
 
     Note: Designed to regress on 1/ν features (pass 1/nu, not nu).
@@ -59,7 +59,7 @@ def fit_surrogate(
     snapshots_train: np.ndarray,
     k: int = 5,
     degree: int = 3,
-) -> tuple:
+) -> tuple[np.ndarray, np.ndarray, Pipeline, float]:
     """
     Entraîne un surrogate POD + régression pour un champ donné.
 
@@ -81,7 +81,7 @@ def predict_field(
     nu_query: np.ndarray,
     mean: np.ndarray,
     modes: np.ndarray,
-    pipe,
+    pipe: Pipeline,
 ) -> np.ndarray:
     """
     Prédit le champ pour les valeurs de ν données.
@@ -175,7 +175,10 @@ def main(data_path: str = "data/dataset.npz", k: int = 5, degree: int = 3) -> No
 
     # --- Split train / test (5 points de test, interpolation) ---
     rng = np.random.default_rng(42)
-    test_idx = rng.choice(len(nu_all), size=5, replace=False)
+    n_test = min(5, len(nu_all) - 1)
+    if n_test < 1:
+        raise ValueError(f"Dataset must have >= 2 samples for train/test split, got {len(nu_all)}")
+    test_idx = rng.choice(len(nu_all), size=n_test, replace=False)
     train_mask = np.ones(len(nu_all), dtype=bool)
     train_mask[test_idx] = False
 
