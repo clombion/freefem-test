@@ -28,13 +28,39 @@ def _(mo):
     mo.md("""
 # Surrogate POD — Stokes en cavité entraînée
 
-Ce notebook charge un modèle surrogate (POD + régression polynomiale)
-entraîné sur des simulations FreeFEM de l'écoulement de Stokes
-dans une cavité carrée avec couvercle entraîné.
+## Le problème physique
 
-**Déplacez le slider ν** pour prédire instantanément les champs de vitesse
-et de pression sans relancer FreeFEM.
+On simule un **écoulement de Stokes** dans un carré [0,1]×[0,1] :
+le couvercle supérieur se déplace à vitesse constante (u=1, v=0),
+toutes les autres parois sont fixes (condition de non-glissement).
+
+C'est le problème classique de la **lid-driven cavity** — un benchmark
+fondamental en mécanique des fluides numérique.
+
+Les équations de Stokes (régime lent, sans inertie) s'écrivent :
+
+$$-\\nu \\, \\Delta \\mathbf{u} + \\nabla p = 0, \\quad \\nabla \\cdot \\mathbf{u} = 0$$
+
+où **ν** est la viscosité cinématique et **u**, **p** sont la vitesse et la pression.
+
+## L'approche surrogate
+
+Au lieu de relancer une simulation FreeFEM à chaque changement de ν,
+on construit un **modèle réduit (ROM)** :
+
+1. **Générer un dataset** : 40 simulations FreeFEM pour ν ∈ [0.005, 2.0]
+2. **Décomposer par POD** (Proper Orthogonal Decomposition) : extraire les modes
+   dominants via SVD — quelques modes suffisent à capturer 99% de l'énergie
+3. **Régresser** : un polynôme en 1/ν prédit les coefficients POD pour tout ν
+
+Résultat : la prédiction est **instantanée** (~1 ms) au lieu de ~0.1 s par simulation.
 """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("## Chargement du dataset et entraînement")
     return
 
 
@@ -65,18 +91,35 @@ def _(fit_surrogate, nu_all, UX, UY, P):
 
 
 @app.cell
-def _(mo, e_ux, e_uy, e_p, k):
-    mo.md(
-        f"""
-        **Modèle entraîné** — POD avec k={k} modes
+def _(mo, e_ux, e_uy, e_p, k, nu_all):
+    mo.md(f"""
+Le surrogate est entraîné sur les **{len(nu_all)} simulations** du dataset
+avec **k={k} modes POD**. La fraction d'énergie capturée par ces modes
+mesure la qualité de la décomposition (100% = reconstruction parfaite) :
 
-        | Champ | Énergie capturée |
-        |-------|-----------------|
-        | ux    | {e_ux * 100:.2f}% |
-        | uy    | {e_uy * 100:.2f}% |
-        | p     | {e_p * 100:.2f}% |
-        """
-    )
+| Champ | Description | Énergie capturée |
+|-------|-------------|-----------------|
+| ux    | Vitesse horizontale | {e_ux * 100:.2f}% |
+| uy    | Vitesse verticale   | {e_uy * 100:.2f}% |
+| p     | Pression            | {e_p * 100:.2f}% |
+
+Pour Stokes, la solution varie linéairement en 1/ν — le surrogate
+capture cette structure et prédit avec une erreur quasi nulle.
+""")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+## Exploration interactive
+
+Déplacez le slider pour choisir une viscosité ν.
+Le surrogate prédit instantanément les champs correspondants.
+
+- **ν petit** (→ 0.005) : écoulement plus vigoureux, gradients plus forts
+- **ν grand** (→ 2.0) : écoulement amorti, champs plus lisses
+""")
     return
 
 
@@ -111,11 +154,20 @@ def _(
 @app.cell
 def _(mo, nu, np, ux_pred, uy_pred):
     speed = float(np.max(np.sqrt(ux_pred**2 + uy_pred**2)))
-    mo.md(
-        f"""
-        ### ν = {nu:.4f} — max |u| = {speed:.4f}
-        """
-    )
+    mo.md(f"### ν = {nu:.4f} — max |u| = {speed:.4f}")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+### Champs scalaires
+
+De gauche à droite : vitesse horizontale (**ux**), vitesse verticale (**uy**),
+et **pression** (p). Les couleurs indiquent l'intensité — le couvercle
+entraîne le fluide vers la droite (ux ≈ 1 en haut), créant un
+tourbillon de recirculation visible sur uy.
+""")
     return
 
 
@@ -129,21 +181,34 @@ def _(plt, np, X, Y, n_grid, ux_pred, uy_pred, p_pred, nu):
 
     im1 = ax1.contourf(xi, yi, ux_pred.reshape(n_grid, n_grid), levels=30)
     plt.colorbar(im1, ax=ax1, shrink=0.8)
-    ax1.set_title("ux")
+    ax1.set_title("ux (vitesse horizontale)")
     ax1.set_aspect("equal")
 
     im2 = ax2.contourf(xi, yi, uy_pred.reshape(n_grid, n_grid), levels=30)
     plt.colorbar(im2, ax=ax2, shrink=0.8)
-    ax2.set_title("uy")
+    ax2.set_title("uy (vitesse verticale)")
     ax2.set_aspect("equal")
 
     im3 = ax3.contourf(xi, yi, p_pred.reshape(n_grid, n_grid), levels=30)
     plt.colorbar(im3, ax=ax3, shrink=0.8)
-    ax3.set_title("p")
+    ax3.set_title("p (pression)")
     ax3.set_aspect("equal")
 
     plt.tight_layout()
     fig
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+### Champ de vecteurs
+
+Les flèches montrent la direction et l'intensité de l'écoulement.
+Le fond coloré indique la norme de la vitesse (magnitude).
+On observe le tourbillon principal créé par le couvercle entraîné :
+le fluide descend le long de la paroi droite et remonte par la gauche.
+""")
     return
 
 
@@ -156,7 +221,8 @@ def _(plt, np, X, Y, n_grid, ux_pred, uy_pred, nu):
     speed_g = np.sqrt(ux_g**2 + uy_g**2)
 
     fig_v, ax_v = plt.subplots(figsize=(6, 5))
-    ax_v.contourf(xi_v, yi_v, speed_g, levels=30, cmap="viridis")
+    im_v = ax_v.contourf(xi_v, yi_v, speed_g, levels=30, cmap="viridis")
+    plt.colorbar(im_v, ax=ax_v, shrink=0.8, label="|u|")
 
     skip = 3
     ax_v.quiver(
@@ -165,9 +231,25 @@ def _(plt, np, X, Y, n_grid, ux_pred, uy_pred, nu):
         color="white", alpha=0.7, scale=20,
     )
     ax_v.set_title(f"Champ de vitesse — ν = {nu:.4f}")
+    ax_v.set_xlabel("x")
+    ax_v.set_ylabel("y")
     ax_v.set_aspect("equal")
     plt.tight_layout()
     fig_v
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+## Validation du surrogate
+
+Le graphique ci-dessous compare la quantité scalaire max|u| issue des
+40 simulations FreeFEM (points bleus) avec la prédiction continue du
+surrogate (courbe orange). Pour Stokes, max|u| est constant car la
+vitesse du couvercle impose l'échelle — le surrogate reproduit cette
+propriété exactement.
+""")
     return
 
 
@@ -186,13 +268,33 @@ def _(
     fig_s, ax_s = plt.subplots(figsize=(8, 4))
     ax_s.loglog(nu_all, max_u_data, "o", markersize=5, label="Simulations FreeFEM")
     ax_s.loglog(nu_sweep, max_u_sweep, "-", linewidth=2, label="Surrogate POD")
-    ax_s.set_xlabel("ν")
+    ax_s.set_xlabel("ν (viscosité cinématique)")
     ax_s.set_ylabel("max |u|")
-    ax_s.set_title("max |u| vs ν — surrogate vs simulations")
+    ax_s.set_title("Validation : max |u| vs ν")
     ax_s.legend()
     ax_s.grid(True, which="both", alpha=0.3)
     plt.tight_layout()
     fig_s
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+---
+
+## Comment ça marche en coulisses
+
+1. **FreeFEM** résout les EDP de Stokes par éléments finis (Taylor-Hood P2/P1)
+   sur un maillage 40×40 pour 40 valeurs de ν log-espacées
+2. **POD** (SVD de la matrice de snapshots) extrait les k modes spatiaux
+   dominants — chaque solution se décompose en combinaison linéaire de ces modes
+3. **Régression polynomiale** en 1/ν prédit les coefficients de cette
+   décomposition pour tout ν, sans résoudre les EDP
+
+Le coût passe de **O(N³)** (résolution EF) à **O(k)** (produit matrice-vecteur) — un
+gain de plusieurs ordres de grandeur.
+""")
     return
 
 
