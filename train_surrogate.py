@@ -6,6 +6,7 @@ Usage:
     python train_surrogate.py [--data data/dataset.npz] [--k 5] [--deg 3]
 """
 import argparse
+import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import PolynomialFeatures
@@ -35,19 +36,20 @@ def compute_pod(
     _, s, Vt = np.linalg.svd(U_c, full_matrices=False)
     rank = Vt.shape[0]
     if k > rank:
-        import warnings
         warnings.warn(f"k={k} exceeds matrix rank {rank}; clamped to {rank}", stacklevel=2)
         k = rank
     modes = Vt[:k]
     coeffs = U_c @ modes.T
-    energy = float((s[:k] ** 2).sum() / (s ** 2).sum())
+    denom = float((s ** 2).sum())
+    energy = float((s[:k] ** 2).sum() / denom) if denom > 0.0 else 0.0
     return mean, modes, coeffs, energy
 
 
-def make_regression_pipe(degree: int = 3, alpha: float = 1e-3):
+def make_regression_pipe(degree: int = 3, alpha: float = 0.01):
     """Pipeline sklearn : PolynomialFeatures(degree) + Ridge(alpha).
 
     Note: Designed to regress on 1/ν features (pass 1/nu, not nu).
+    Alpha=0.01 prevents ill-conditioned matrix warnings on wide 1/ν ranges.
     """
     return make_pipeline(PolynomialFeatures(degree=degree), Ridge(alpha=alpha))
 
@@ -95,8 +97,10 @@ def predict_field(
     Returns:
         (M, Ngrid) champs prédits
     """
-    nu_inv = 1.0 / np.atleast_1d(nu_query)
-    coeffs_pred = pipe.predict(nu_inv.reshape(-1, 1))
+    nu_arr = np.atleast_1d(nu_query)
+    if np.any(nu_arr <= 0):
+        raise ValueError(f"nu must be > 0, got values <= 0: {nu_arr[nu_arr <= 0]}")
+    coeffs_pred = pipe.predict((1.0 / nu_arr).reshape(-1, 1))
     return coeffs_pred @ modes + mean
 
 
