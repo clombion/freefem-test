@@ -96,7 +96,7 @@ def _(np):
     _url = "https://raw.githubusercontent.com/clombion/freefem-test/main/data/dataset.npz"
     with urllib.request.urlopen(_url) as _resp:
         _buf = io.BytesIO(_resp.read())
-    data = np.load(_buf)
+    data = np.load(_buf, allow_pickle=True)
     nu_all = data["nu_values"]
     X, Y = data["X"], data["Y"]
     UX, UY, P = data["UX"], data["UY"], data["P"]
