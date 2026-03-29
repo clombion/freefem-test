@@ -4,6 +4,7 @@
 #     "marimo",
 #     "numpy>=1.26",
 #     "scikit-learn>=1.4",
+#     "scipy>=1.10",
 #     "matplotlib>=3.8",
 # ]
 # ///
@@ -11,7 +12,7 @@
 import marimo
 
 __generated_with = "0.21.1"
-app = marimo.App(width="medium")
+app = marimo.App(width="full")
 
 
 @app.cell
@@ -20,7 +21,6 @@ def _():
     import numpy as np
     import matplotlib.pyplot as plt
     from pathlib import Path
-
     return Path, mo, np, plt
 
 
@@ -35,88 +35,78 @@ def _(mo):
     le couvercle supérieur se déplace à vitesse constante (u=1, v=0),
     toutes les autres parois sont fixes (condition de non-glissement).
 
-    C'est le problème classique de la **lid-driven cavity** — un benchmark
-    fondamental en mécanique des fluides numérique.
-
     Les équations de Stokes (régime lent, sans inertie) s'écrivent :
 
-    $$-\nu \, \Delta \mathbf{u} + \nabla p = 0, \quad \nabla \cdot \mathbf{u} = 0$$
-
-    où **ν** est la viscosité cinématique et **u**, **p** sont la vitesse et la pression.
+    $$-\\nu \\, \\Delta \\mathbf{u} + \\nabla p = 0, \\quad \\nabla \\cdot \\mathbf{u} = 0$$
 
     ## L'approche surrogate
 
-    Au lieu de relancer une simulation FreeFEM à chaque changement de ν,
-    on construit un **modèle réduit (ROM)** :
-
     1. **Générer un dataset** : 40 simulations FreeFEM pour ν ∈ [0.005, 2.0]
-    2. **Décomposer par POD** (Proper Orthogonal Decomposition) : extraire les modes
-       dominants via SVD — quelques modes suffisent à capturer 99% de l'énergie
-    3. **Régresser** : un polynôme en 1/ν prédit les coefficients POD pour tout ν
+    2. **Décomposer par POD** (SVD) — quelques modes capturent >99% de l'énergie
+    3. **Régresser** : un polynôme en 1/ν prédit les coefficients POD
 
-    Résultat : la prédiction est **instantanée** (~1 ms) au lieu de ~0.1 s par simulation.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md("""
-    ## Chargement du dataset et entraînement
+    Résultat : prédiction **instantanée** (~1 ms) au lieu de ~100 ms par simulation.
     """)
     return
 
 
 @app.cell
 def _(Path, np):
-    from train_surrogate import fit_surrogate, predict_field
+    from train_surrogate import compute_pod, fit_surrogate, predict_field
 
     data = np.load(Path("data/dataset.npz"))
     nu_all = data["nu_values"]
     X, Y = data["X"], data["Y"]
     UX, UY, P = data["UX"], data["UY"], data["P"]
     n_grid = int(round(len(X) ** 0.5))
-    return P, UX, UY, X, Y, fit_surrogate, n_grid, nu_all, predict_field
+    return compute_pod, fit_surrogate, predict_field, nu_all, X, Y, UX, UY, P, n_grid
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## Paramètres du modèle
+
+    Ajustez les paramètres du surrogate. **k** contrôle le nombre de modes POD
+    retenus (plus = plus précis mais plus lent à entraîner). **Degré** contrôle
+    la complexité du polynôme de régression.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    k_slider = mo.ui.slider(start=1, stop=20, value=5, step=1, label="k (modes POD)")
+    deg_slider = mo.ui.slider(start=1, stop=6, value=3, step=1, label="Degré polynomial")
+    mo.hstack([k_slider, deg_slider], gap=2)
+    return k_slider, deg_slider
 
 
 @app.cell
-def _(P, UX, UY, fit_surrogate, nu_all):
-    k, degree = 5, 3
+def _(P, UX, UY, deg_slider, fit_surrogate, k_slider, nu_all):
+    k = k_slider.value
+    degree = deg_slider.value
     mean_ux, modes_ux, pipe_ux, e_ux = fit_surrogate(nu_all, UX, k, degree)
     mean_uy, modes_uy, pipe_uy, e_uy = fit_surrogate(nu_all, UY, k, degree)
     mean_p, modes_p, pipe_p, e_p = fit_surrogate(nu_all, P, k, degree)
     return (
-        e_p,
-        e_ux,
-        e_uy,
-        k,
-        mean_p,
-        mean_ux,
-        mean_uy,
-        modes_p,
-        modes_ux,
-        modes_uy,
-        pipe_p,
-        pipe_ux,
-        pipe_uy,
+        k, degree,
+        mean_ux, modes_ux, pipe_ux, e_ux,
+        mean_uy, modes_uy, pipe_uy, e_uy,
+        mean_p, modes_p, pipe_p, e_p,
     )
 
 
 @app.cell(hide_code=True)
-def _(e_p, e_ux, e_uy, k, mo, nu_all):
+def _(e_p, e_ux, e_uy, k, degree, mo):
     mo.md(f"""
-    Le surrogate est entraîné sur les **{len(nu_all)} simulations** du dataset
-    avec **k={k} modes POD**. La fraction d'énergie capturée par ces modes
-    mesure la qualité de la décomposition (100% = reconstruction parfaite) :
+    **Modèle entraîné** — k={k} modes, degré {degree}
 
-    | Champ | Description | Énergie capturée |
-    |-------|-------------|-----------------|
-    | ux    | Vitesse horizontale | {e_ux * 100:.2f}% |
-    | uy    | Vitesse verticale   | {e_uy * 100:.2f}% |
-    | p     | Pression            | {e_p * 100:.2f}% |
-
-    Pour Stokes, la solution varie linéairement en 1/ν — le surrogate
-    capture cette structure et prédit avec une erreur quasi nulle.
+    | Champ | Énergie POD |
+    |-------|------------|
+    | ux | {e_ux * 100:.2f}% |
+    | uy | {e_uy * 100:.2f}% |
+    | p  | {e_p * 100:.2f}% |
     """)
     return
 
@@ -126,11 +116,8 @@ def _(mo):
     mo.md("""
     ## Exploration interactive
 
-    Déplacez le slider pour choisir une viscosité ν.
-    Le surrogate prédit instantanément les champs correspondants.
-
-    - **ν petit** (→ 0.005) : écoulement plus vigoureux, gradients plus forts
-    - **ν grand** (→ 2.0) : écoulement amorti, champs plus lisses
+    - **ν petit** (→ 0.005) : écoulement vigoureux, gradients forts
+    - **ν grand** (→ 2.0) : écoulement amorti, champs lisses
     """)
     return
 
@@ -145,165 +132,280 @@ def _(mo, nu_all):
         label="ν (viscosité cinématique)",
         full_width=True,
     )
-    nu_slider
-    return (nu_slider,)
+    field_dropdown = mo.ui.dropdown(
+        options={"Vitesse horizontale (ux)": "ux", "Vitesse verticale (uy)": "uy",
+                 "Pression (p)": "p", "Magnitude vitesse (|u|)": "speed"},
+        value="speed",
+        label="Champ à afficher",
+    )
+    cmap_dropdown = mo.ui.dropdown(
+        options=["viridis", "coolwarm", "plasma", "RdBu_r", "inferno", "cividis"],
+        value="viridis",
+        label="Colormap",
+    )
+    mo.vstack([
+        nu_slider,
+        mo.hstack([field_dropdown, cmap_dropdown], gap=2),
+    ])
+    return nu_slider, field_dropdown, cmap_dropdown
 
 
 @app.cell
 def _(
-    mean_p,
-    mean_ux,
-    mean_uy,
-    modes_p,
-    modes_ux,
-    modes_uy,
-    np,
-    nu_slider,
-    pipe_p,
-    pipe_ux,
-    pipe_uy,
-    predict_field,
+    predict_field, np, nu_slider,
+    mean_ux, modes_ux, pipe_ux,
+    mean_uy, modes_uy, pipe_uy,
+    mean_p, modes_p, pipe_p,
 ):
     nu = nu_slider.value
     ux_pred = predict_field(np.array([nu]), mean_ux, modes_ux, pipe_ux)[0]
     uy_pred = predict_field(np.array([nu]), mean_uy, modes_uy, pipe_uy)[0]
     p_pred = predict_field(np.array([nu]), mean_p, modes_p, pipe_p)[0]
-    return nu, p_pred, ux_pred, uy_pred
+    speed_pred = np.sqrt(ux_pred**2 + uy_pred**2)
+    return nu, ux_pred, uy_pred, p_pred, speed_pred
 
 
-@app.cell
-def _(mo, np, nu, ux_pred, uy_pred):
-    speed = float(np.max(np.sqrt(ux_pred**2 + uy_pred**2)))
-    mo.md(f"### ν = {nu:.4f} — max |u| = {speed:.4f}")
+@app.cell(hide_code=True)
+def _(mo, nu, np, speed_pred):
+    max_speed = float(np.max(speed_pred))
+    mo.md(f"### ν = {nu:.4f} — max |u| = {max_speed:.4f}")
     return
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    mo.md("""
-    ### Champs scalaires
-
-    De gauche à droite : vitesse horizontale (**ux**), vitesse verticale (**uy**),
-    et **pression** (p). Les couleurs indiquent l'intensité — le couvercle
-    entraîne le fluide vers la droite (ux ≈ 1 en haut), créant un
-    tourbillon de recirculation visible sur uy.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(X, Y, n_grid, nu, p_pred, plt, ux_pred, uy_pred):
+def _(X, Y, n_grid, nu, ux_pred, uy_pred, p_pred, speed_pred,
+      field_dropdown, cmap_dropdown, np, plt, mo):
     xi = X.reshape(n_grid, n_grid)
     yi = Y.reshape(n_grid, n_grid)
 
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
-    fig.suptitle(f"Prédiction surrogate POD — ν = {nu:.4f}", fontsize=14)
+    fields = {"ux": ux_pred, "uy": uy_pred, "p": p_pred, "speed": speed_pred}
+    labels = {"ux": "ux (vitesse horizontale)", "uy": "uy (vitesse verticale)",
+              "p": "p (pression)", "speed": "|u| (magnitude vitesse)"}
+    field_key = field_dropdown.value
+    field_data = fields[field_key].reshape(n_grid, n_grid)
+    cmap = cmap_dropdown.value
 
-    im1 = ax1.contourf(xi, yi, ux_pred.reshape(n_grid, n_grid), levels=30)
-    plt.colorbar(im1, ax=ax1, shrink=0.8)
-    ax1.set_title("ux (vitesse horizontale)")
-    ax1.set_aspect("equal")
+    fig_main, axes_main = plt.subplots(1, 2, figsize=(13, 5))
 
-    im2 = ax2.contourf(xi, yi, uy_pred.reshape(n_grid, n_grid), levels=30)
-    plt.colorbar(im2, ax=ax2, shrink=0.8)
-    ax2.set_title("uy (vitesse verticale)")
-    ax2.set_aspect("equal")
+    # Left: selected field contour
+    im1 = axes_main[0].contourf(xi, yi, field_data, levels=30, cmap=cmap)
+    plt.colorbar(im1, ax=axes_main[0], shrink=0.8)
+    axes_main[0].set_title(f"{labels[field_key]} — ν={nu:.4f}")
+    axes_main[0].set_xlabel("x")
+    axes_main[0].set_ylabel("y")
+    axes_main[0].set_aspect("equal")
 
-    im3 = ax3.contourf(xi, yi, p_pred.reshape(n_grid, n_grid), levels=30)
-    plt.colorbar(im3, ax=ax3, shrink=0.8)
-    ax3.set_title("p (pression)")
-    ax3.set_aspect("equal")
-
-    plt.tight_layout()
-    fig
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md("""
-    ### Champ de vecteurs
-
-    Les flèches montrent la direction et l'intensité de l'écoulement.
-    Le fond coloré indique la norme de la vitesse (magnitude).
-    On observe le tourbillon principal créé par le couvercle entraîné :
-    le fluide descend le long de la paroi droite et remonte par la gauche.
-    """)
-    return
-
-
-@app.cell
-def _(X, Y, n_grid, np, nu, plt, ux_pred, uy_pred):
-    xi_v = X.reshape(n_grid, n_grid)
-    yi_v = Y.reshape(n_grid, n_grid)
+    # Right: velocity vectors on speed background
     ux_g = ux_pred.reshape(n_grid, n_grid)
     uy_g = uy_pred.reshape(n_grid, n_grid)
     speed_g = np.sqrt(ux_g**2 + uy_g**2)
-
-    fig_v, ax_v = plt.subplots(figsize=(6, 5))
-    im_v = ax_v.contourf(xi_v, yi_v, speed_g, levels=30, cmap="viridis")
-    plt.colorbar(im_v, ax=ax_v, shrink=0.8, label="|u|")
-
+    im2 = axes_main[1].contourf(xi, yi, speed_g, levels=30, cmap="viridis")
+    plt.colorbar(im2, ax=axes_main[1], shrink=0.8, label="|u|")
     skip = 3
-    ax_v.quiver(
-        xi_v[::skip, ::skip], yi_v[::skip, ::skip],
+    axes_main[1].quiver(
+        xi[::skip, ::skip], yi[::skip, ::skip],
         ux_g[::skip, ::skip], uy_g[::skip, ::skip],
         color="white", alpha=0.7, scale=20,
     )
-    ax_v.set_title(f"Champ de vitesse — ν = {nu:.4f}")
-    ax_v.set_xlabel("x")
-    ax_v.set_ylabel("y")
-    ax_v.set_aspect("equal")
+    axes_main[1].set_title(f"Champ de vitesse — ν={nu:.4f}")
+    axes_main[1].set_xlabel("x")
+    axes_main[1].set_ylabel("y")
+    axes_main[1].set_aspect("equal")
     plt.tight_layout()
-    fig_v
+
+    mo.center(fig_main)
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-    ## Validation du surrogate
+    ## Profil de vitesse sur la ligne centrale
 
-    Le graphique ci-dessous compare la quantité scalaire max|u| issue des
-    40 simulations FreeFEM (points bleus) avec la prédiction continue du
-    surrogate (courbe orange). Pour Stokes, max|u| est constant car la
-    vitesse du couvercle impose l'échelle — le surrogate reproduit cette
-    propriété exactement.
+    Coupe verticale à **x = 0.5** : profil classique de la cavité entraînée.
+    Le profil montre la transition entre la vitesse du couvercle (ux ≈ 1 en y=1)
+    et la recirculation (ux < 0 dans la partie basse).
+
+    C'est le diagnostic standard pour valider une simulation de cavité —
+    comparez avec les résultats de référence de Ghia et al. (1982).
     """)
     return
 
 
-@app.cell
-def _(
-    UX,
-    UY,
-    mean_ux,
-    mean_uy,
-    modes_ux,
-    modes_uy,
-    np,
-    nu_all,
-    pipe_ux,
-    pipe_uy,
-    plt,
-    predict_field,
-):
+@app.cell(hide_code=True)
+def _(X, Y, n_grid, nu, ux_pred, uy_pred, np, plt, mo):
+    xi_cl = X.reshape(n_grid, n_grid)
+    yi_cl = Y.reshape(n_grid, n_grid)
+    ux_cl = ux_pred.reshape(n_grid, n_grid)
+    uy_cl = uy_pred.reshape(n_grid, n_grid)
+
+    # Vertical centerline at x=0.5 (column index n_grid//2)
+    mid_col = n_grid // 2
+    y_line = yi_cl[:, mid_col]
+    ux_line = ux_cl[:, mid_col]
+
+    # Horizontal centerline at y=0.5 (row index n_grid//2)
+    mid_row = n_grid // 2
+    x_line = xi_cl[mid_row, :]
+    uy_line = uy_cl[mid_row, :]
+
+    fig_cl, (ax_cl1, ax_cl2) = plt.subplots(1, 2, figsize=(12, 4))
+
+    ax_cl1.plot(ux_line, y_line, "b-", linewidth=2)
+    ax_cl1.axhline(y=0.5, color="gray", linestyle="--", alpha=0.5)
+    ax_cl1.axvline(x=0, color="gray", linestyle="--", alpha=0.5)
+    ax_cl1.set_xlabel("ux")
+    ax_cl1.set_ylabel("y")
+    ax_cl1.set_title(f"ux le long de x=0.5 — ν={nu:.4f}")
+    ax_cl1.grid(True, alpha=0.3)
+
+    ax_cl2.plot(x_line, uy_line, "r-", linewidth=2)
+    ax_cl2.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
+    ax_cl2.axvline(x=0.5, color="gray", linestyle="--", alpha=0.5)
+    ax_cl2.set_xlabel("x")
+    ax_cl2.set_ylabel("uy")
+    ax_cl2.set_title(f"uy le long de y=0.5 — ν={nu:.4f}")
+    ax_cl2.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    mo.center(fig_cl)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## Spectre POD — énergie par mode
+
+    Le spectre des valeurs singulières montre combien de modes sont nécessaires
+    pour capturer l'essentiel de l'information. Pour Stokes (problème linéaire),
+    l'énergie est concentrée dans très peu de modes — la courbe chute rapidement.
+    La ligne rouge indique le nombre de modes **k** sélectionné ci-dessus.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(UX, k, np, plt, mo):
+    # Compute full spectrum (all modes)
+    mean_full = UX.mean(axis=0)
+    U_c = UX - mean_full
+    _, s_full, _ = np.linalg.svd(U_c, full_matrices=False)
+    energy_cumul = np.cumsum(s_full**2) / (s_full**2).sum()
+
+    fig_spec, (ax_sp1, ax_sp2) = plt.subplots(1, 2, figsize=(12, 4))
+
+    # Singular values
+    ax_sp1.semilogy(range(1, len(s_full) + 1), s_full, "ko-", markersize=4)
+    ax_sp1.axvline(x=k, color="red", linestyle="--", label=f"k={k}")
+    ax_sp1.set_xlabel("Mode index")
+    ax_sp1.set_ylabel("Valeur singulière σ")
+    ax_sp1.set_title("Spectre des valeurs singulières (ux)")
+    ax_sp1.legend()
+    ax_sp1.grid(True, alpha=0.3)
+
+    # Cumulative energy
+    ax_sp2.plot(range(1, len(energy_cumul) + 1), energy_cumul * 100, "b-o", markersize=4)
+    ax_sp2.axvline(x=k, color="red", linestyle="--", label=f"k={k}")
+    ax_sp2.axhline(y=99.9, color="gray", linestyle=":", alpha=0.5, label="99.9%")
+    ax_sp2.set_xlabel("Nombre de modes")
+    ax_sp2.set_ylabel("Énergie cumulée (%)")
+    ax_sp2.set_title("Énergie cumulée")
+    ax_sp2.set_ylim([0, 101])
+    ax_sp2.legend()
+    ax_sp2.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    mo.center(fig_spec)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## Comparaison surrogate vs simulation la plus proche
+
+    Le surrogate prédit pour n'importe quel ν, mais le dataset contient 40
+    simulations exactes. On compare la prédiction du surrogate avec la simulation
+    FreeFEM la plus proche en ν — l'erreur absolue montre la fidélité du modèle réduit.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(X, Y, UX, UY, n_grid, nu, nu_all, np, ux_pred, uy_pred, plt, mo):
+    # Find closest simulation in dataset
+    closest_idx = int(np.argmin(np.abs(nu_all - nu)))
+    nu_closest = nu_all[closest_idx]
+    ux_true = UX[closest_idx]
+    uy_true = UY[closest_idx]
+
+    xi_c = X.reshape(n_grid, n_grid)
+    yi_c = Y.reshape(n_grid, n_grid)
+
+    speed_true = np.sqrt(ux_true**2 + uy_true**2)
+    speed_surr = np.sqrt(ux_pred**2 + uy_pred**2)
+    speed_err = np.abs(speed_surr - speed_true)
+
+    fig_cmp, (ax_c1, ax_c2, ax_c3) = plt.subplots(1, 3, figsize=(15, 4))
+
+    vmin = min(speed_true.min(), speed_surr.min())
+    vmax = max(speed_true.max(), speed_surr.max())
+
+    im_c1 = ax_c1.contourf(xi_c, yi_c, speed_surr.reshape(n_grid, n_grid),
+                            levels=30, vmin=vmin, vmax=vmax)
+    plt.colorbar(im_c1, ax=ax_c1, shrink=0.8)
+    ax_c1.set_title(f"Surrogate |u| (ν={nu:.4f})")
+    ax_c1.set_aspect("equal")
+
+    im_c2 = ax_c2.contourf(xi_c, yi_c, speed_true.reshape(n_grid, n_grid),
+                            levels=30, vmin=vmin, vmax=vmax)
+    plt.colorbar(im_c2, ax=ax_c2, shrink=0.8)
+    ax_c2.set_title(f"FreeFEM |u| (ν={nu_closest:.4f})")
+    ax_c2.set_aspect("equal")
+
+    im_c3 = ax_c3.contourf(xi_c, yi_c, speed_err.reshape(n_grid, n_grid),
+                            levels=30, cmap="hot_r")
+    plt.colorbar(im_c3, ax=ax_c3, shrink=0.8)
+    ax_c3.set_title(f"|erreur| max={speed_err.max():.2e}")
+    ax_c3.set_aspect("equal")
+
+    plt.suptitle(f"Comparaison: surrogate (ν={nu:.4f}) vs simulation (ν={nu_closest:.4f})")
+    plt.tight_layout()
+    mo.center(fig_cmp)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## Validation globale
+
+    max|u| vs ν sur tout le dataset. Les points sont les simulations FreeFEM,
+    la courbe est le surrogate.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(UX, UY, mean_ux, mean_uy, modes_ux, modes_uy, np, nu_all,
+      pipe_ux, pipe_uy, plt, predict_field, mo):
     nu_sweep = np.logspace(np.log10(nu_all.min()), np.log10(nu_all.max()), 200)
     ux_sw = predict_field(nu_sweep, mean_ux, modes_ux, pipe_ux)
     uy_sw = predict_field(nu_sweep, mean_uy, modes_uy, pipe_uy)
     max_u_sweep = np.max(np.sqrt(ux_sw**2 + uy_sw**2), axis=1)
     max_u_data = np.max(np.sqrt(UX**2 + UY**2), axis=1)
 
-    fig_s, ax_s = plt.subplots(figsize=(8, 4))
-    ax_s.loglog(nu_all, max_u_data, "o", markersize=5, label="Simulations FreeFEM")
-    ax_s.loglog(nu_sweep, max_u_sweep, "-", linewidth=2, label="Surrogate POD")
-    ax_s.set_xlabel("ν (viscosité cinématique)")
-    ax_s.set_ylabel("max |u|")
-    ax_s.set_title("Validation : max |u| vs ν")
-    ax_s.legend()
-    ax_s.grid(True, which="both", alpha=0.3)
+    fig_val, ax_val = plt.subplots(figsize=(8, 4))
+    ax_val.loglog(nu_all, max_u_data, "o", markersize=5, label="Simulations FreeFEM")
+    ax_val.loglog(nu_sweep, max_u_sweep, "-", linewidth=2, label="Surrogate POD")
+    ax_val.set_xlabel("ν (viscosité cinématique)")
+    ax_val.set_ylabel("max |u|")
+    ax_val.set_title("Validation : max |u| vs ν")
+    ax_val.legend()
+    ax_val.grid(True, which="both", alpha=0.3)
     plt.tight_layout()
-    fig_s
+    mo.center(fig_val)
     return
 
 
