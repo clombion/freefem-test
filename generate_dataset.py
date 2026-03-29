@@ -66,7 +66,8 @@ def run_simulation(nu: float) -> Path:
                     f"CSV annoncé mais absent: {csv_path}\n"
                     "Vérifier que data/snapshots/ existe avant de lancer FreeFEM."
                 )
-            line_count = sum(1 for _ in csv_path.open())
+            with csv_path.open() as fh:
+                line_count = sum(1 for _ in fh)
             if line_count != 2602:
                 raise FileNotFoundError(
                     f"CSV tronqué: {csv_path} a {line_count} lignes, attendu 2602."

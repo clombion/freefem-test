@@ -1,0 +1,11 @@
+# Dataset files (large, generated)
+data/snapshots/
+data/dataset.npz
+data/*.png
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
