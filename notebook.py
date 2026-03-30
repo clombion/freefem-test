@@ -101,7 +101,7 @@ async def _(np):
         import urllib.request
         with urllib.request.urlopen(_url) as _r:
             _bytes = _r.read()
-    data = np.load(io.BytesIO(_bytes))
+    data = np.load(io.BytesIO(_bytes), allow_pickle=True)
     nu_all = data["nu_values"]
     X, Y = data["X"], data["Y"]
     UX, UY, P = data["UX"], data["UY"], data["P"]
