@@ -1,0 +1,90 @@
+// ============================================================
+// Écoulement de Navier-Stokes en cavité entraînée (lid-driven cavity)
+// Formulation mixte Taylor-Hood P2/P1 + itérations de Picard
+//
+// Mode batch : ν passé via -nu (ex: FreeFem++ -nw navier_stokes_cavity.edp -nu 0.1)
+// Exporte les champs sur une grille régulière 51×51 en CSV.
+// ============================================================
+
+// --- Paramètres -----------------------------------------------
+include "getARGV.idp"
+int    Nn = 40;
+real   nu = getARGV("-nu", 1.0);
+int    maxiter = 200;
+real   tol = 1e-6;
+
+// --- Maillage -------------------------------------------------
+mesh Th = square(Nn, Nn);
+
+// --- Espaces éléments finis (Taylor-Hood P2/P1) ---------------
+fespace Xh(Th, [P2, P2, P1]);
+Xh [ux, uy, p], [vx, vy, q];
+Xh [uxo, uyo, po];  // solution précédente pour Picard
+
+// --- Initialisation avec Stokes ------------------------------
+solve Stokes([ux, uy, p], [vx, vy, q]) =
+    int2d(Th)(
+        nu * (  dx(ux)*dx(vx) + dy(ux)*dy(vx)
+              + dx(uy)*dx(vy) + dy(uy)*dy(vy) )
+      - p * (dx(vx) + dy(vy))
+      - q * (dx(ux) + dy(uy))
+      + 1e-10 * p * q
+    )
+    + on(1, ux=0, uy=0)
+    + on(2, ux=0, uy=0)
+    + on(3, ux=1, uy=0)
+    + on(4, ux=0, uy=0);
+
+// --- Itérations de Picard pour Navier-Stokes -----------------
+// Linéarisation: (u^{n} · ∇) u^{n+1} - ν Δ u^{n+1} + ∇p^{n+1} = 0
+int iter;
+for (iter = 0; iter < maxiter; iter++) {
+    uxo[] = ux[];  // copie solution courante
+
+    solve NavierStokes([ux, uy, p], [vx, vy, q]) =
+        int2d(Th)(
+            // Terme convectif linéarisé (Picard)
+            (uxo * dx(ux) + uyo * dy(ux)) * vx
+          + (uxo * dx(uy) + uyo * dy(uy)) * vy
+            // Diffusion
+          + nu * (  dx(ux)*dx(vx) + dy(ux)*dy(vx)
+                  + dx(uy)*dx(vy) + dy(uy)*dy(vy) )
+            // Pression + incompressibilité
+          - p * (dx(vx) + dy(vy))
+          - q * (dx(ux) + dy(uy))
+          + 1e-10 * p * q
+        )
+        + on(1, ux=0, uy=0)
+        + on(2, ux=0, uy=0)
+        + on(3, ux=1, uy=0)
+        + on(4, ux=0, uy=0);
+
+    // Convergence check
+    real err = sqrt(int2d(Th)((ux - uxo)^2 + (uy - uyo)^2));
+    if (iter % 10 == 0 || err < tol)
+        cout << "  Picard iter " << iter << "  err=" << err << endl;
+    if (err < tol) break;
+}
+
+// --- Diagnostics ----------------------------------------------
+real divL2 = int2d(Th)( (dx(ux) + dy(uy))^2 );
+real Re = 1.0 / nu;
+cout << "nu=" << nu << "  Re=" << Re << "  iters=" << iter
+     << "  ||div u||^2=" << divL2 << endl;
+
+// --- Export CSV sur grille régulière 51×51 --------------------
+{
+    string fname = "data/snapshots_ns/fields_nu_" + nu + ".csv";
+    ofstream fout(fname);
+    fout << "x,y,ux,uy,p" << endl;
+    int Nout = 50;
+    for (int j = 0; j <= Nout; j++)
+        for (int i = 0; i <= Nout; i++) {
+            real xi = real(i) / Nout;
+            real yj = real(j) / Nout;
+            fout << xi << "," << yj << ","
+                 << ux(xi, yj) << "," << uy(xi, yj) << ","
+                 << p(xi, yj)  << endl;
+        }
+    cout << "Exported: " << fname << endl;
+}

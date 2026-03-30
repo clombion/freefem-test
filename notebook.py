@@ -416,5 +416,251 @@ def _(mo):
     return
 
 
+## ===================================================================
+## Partie 2 : Navier-Stokes — le rôle de la viscosité
+## ===================================================================
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ---
+
+    # Partie 2 : Navier-Stokes — le rôle de la viscosité
+
+    En ajoutant le terme convectif $(\\mathbf{u} \\cdot \\nabla)\\mathbf{u}$, on passe
+    aux **équations de Navier-Stokes** :
+
+    $$(\\mathbf{u} \\cdot \\nabla)\\mathbf{u} - \\nu \\, \\Delta \\mathbf{u} + \\nabla p = 0, \\quad \\nabla \\cdot \\mathbf{u} = 0$$
+
+    La non-linéarité fait que le champ de vitesse **dépend du nombre de Reynolds**
+    Re = UL/ν. À bas Re (ν grand), on retrouve Stokes. À Re élevé (ν petit),
+    l'inertie déforme l'écoulement : le vortex central migre, des recirculations
+    secondaires apparaissent dans les coins.
+
+    Le dataset contient 30 simulations FreeFEM (Picard) pour Re ∈ [1, 100].
+    """)
+    return
+
+
+@app.cell
+async def _(np):
+    import sys as _sys
+
+    _url_ns = "https://raw.githubusercontent.com/clombion/freefem-test/main/data/dataset_ns.npz"
+
+    if "pyodide" in _sys.modules:
+        from pyodide.http import pyfetch as _pyfetch
+        _resp_ns = await _pyfetch(_url_ns)
+        if _resp_ns.status != 200:
+            raise RuntimeError(f"Failed to fetch N-S dataset: HTTP {_resp_ns.status}")
+        with open("/tmp/dataset_ns.npz", "wb") as _f:
+            _f.write(await _resp_ns.bytes())
+        data_ns = np.load("/tmp/dataset_ns.npz")
+    else:
+        data_ns = np.load("data/dataset_ns.npz")
+
+    nu_ns = data_ns["nu_values"]
+    X_ns, Y_ns = data_ns["X"], data_ns["Y"]
+    UX_ns, UY_ns, P_ns = data_ns["UX"], data_ns["UY"], data_ns["P"]
+    n_grid_ns = int(round(len(X_ns) ** 0.5))
+    return nu_ns, X_ns, Y_ns, UX_ns, UY_ns, P_ns, n_grid_ns
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## Paramètres du surrogate Navier-Stokes
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    k_ns_slider = mo.ui.slider(start=1, stop=25, value=10, step=1, label="k (modes POD)")
+    deg_ns_slider = mo.ui.slider(start=1, stop=6, value=3, step=1, label="Degré polynomial")
+    mo.hstack([k_ns_slider, deg_ns_slider], gap=2)
+    return k_ns_slider, deg_ns_slider
+
+
+@app.cell
+def _(UX_ns, UY_ns, P_ns, deg_ns_slider, fit_surrogate, k_ns_slider, nu_ns):
+    k_ns = k_ns_slider.value
+    degree_ns = deg_ns_slider.value
+    mean_ux_ns, modes_ux_ns, pipe_ux_ns, e_ux_ns = fit_surrogate(nu_ns, UX_ns, k_ns, degree_ns)
+    mean_uy_ns, modes_uy_ns, pipe_uy_ns, e_uy_ns = fit_surrogate(nu_ns, UY_ns, k_ns, degree_ns)
+    mean_p_ns, modes_p_ns, pipe_p_ns, e_p_ns = fit_surrogate(nu_ns, P_ns, k_ns, degree_ns)
+    return (
+        k_ns, degree_ns,
+        mean_ux_ns, modes_ux_ns, pipe_ux_ns, e_ux_ns,
+        mean_uy_ns, modes_uy_ns, pipe_uy_ns, e_uy_ns,
+        mean_p_ns, modes_p_ns, pipe_p_ns, e_p_ns,
+    )
+
+
+@app.cell(hide_code=True)
+def _(e_p_ns, e_ux_ns, e_uy_ns, k_ns, degree_ns, mo):
+    mo.md(f"""
+    **Modèle N-S entraîné** — k={k_ns} modes, degré {degree_ns}
+
+    | Champ | Énergie POD |
+    |-------|------------|
+    | ux | {e_ux_ns * 100:.2f}% |
+    | uy | {e_uy_ns * 100:.2f}% |
+    | p  | {e_p_ns * 100:.2f}% |
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## Exploration interactive — effet du Reynolds
+
+    Contrairement à Stokes, ici **ν change réellement l'écoulement** :
+    - **Re ~ 1** (ν = 1.0) : écoulement quasi-Stokes, vortex centré
+    - **Re ~ 100** (ν = 0.01) : vortex décalé, recirculations dans les coins
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo, nu_ns):
+    nu_ns_slider = mo.ui.slider(
+        start=float(nu_ns.min()),
+        stop=float(nu_ns.max()),
+        value=0.1,
+        step=0.001,
+        label="ν (viscosité cinématique)",
+        full_width=True,
+    )
+    field_ns_dropdown = mo.ui.dropdown(
+        options={"Vitesse horizontale (ux)": "ux", "Vitesse verticale (uy)": "uy",
+                 "Pression (p)": "p", "Magnitude vitesse (|u|)": "speed"},
+        value="Magnitude vitesse (|u|)",
+        label="Champ à afficher",
+    )
+    cmap_ns_dropdown = mo.ui.dropdown(
+        options=["viridis", "coolwarm", "plasma", "RdBu_r", "inferno", "cividis"],
+        value="viridis",
+        label="Colormap",
+    )
+    mo.vstack([
+        nu_ns_slider,
+        mo.hstack([field_ns_dropdown, cmap_ns_dropdown], gap=2),
+    ])
+    return nu_ns_slider, field_ns_dropdown, cmap_ns_dropdown
+
+
+@app.cell
+def _(
+    predict_field, np, nu_ns_slider,
+    mean_ux_ns, modes_ux_ns, pipe_ux_ns,
+    mean_uy_ns, modes_uy_ns, pipe_uy_ns,
+    mean_p_ns, modes_p_ns, pipe_p_ns,
+):
+    nu_v = nu_ns_slider.value
+    ux_ns_pred = predict_field(np.array([nu_v]), mean_ux_ns, modes_ux_ns, pipe_ux_ns)[0]
+    uy_ns_pred = predict_field(np.array([nu_v]), mean_uy_ns, modes_uy_ns, pipe_uy_ns)[0]
+    p_ns_pred = predict_field(np.array([nu_v]), mean_p_ns, modes_p_ns, pipe_p_ns)[0]
+    speed_ns_pred = np.sqrt(ux_ns_pred**2 + uy_ns_pred**2)
+    return nu_v, ux_ns_pred, uy_ns_pred, p_ns_pred, speed_ns_pred
+
+
+@app.cell(hide_code=True)
+def _(mo, nu_v, np, speed_ns_pred):
+    _re = 1.0 / nu_v
+    _max_speed = float(np.max(speed_ns_pred))
+    mo.md(f"### ν = {nu_v:.4f} — Re = {_re:.1f} — max |u| = {_max_speed:.4f}")
+    return
+
+
+@app.cell(hide_code=True)
+def _(X_ns, Y_ns, n_grid_ns, nu_v, ux_ns_pred, uy_ns_pred, p_ns_pred, speed_ns_pred,
+      field_ns_dropdown, cmap_ns_dropdown, np, plt, mo):
+    xi_ns = X_ns.reshape(n_grid_ns, n_grid_ns)
+    yi_ns = Y_ns.reshape(n_grid_ns, n_grid_ns)
+
+    fields_ns = {"ux": ux_ns_pred, "uy": uy_ns_pred, "p": p_ns_pred, "speed": speed_ns_pred}
+    labels_ns = {"ux": "ux (vitesse horizontale)", "uy": "uy (vitesse verticale)",
+                 "p": "p (pression)", "speed": "|u| (magnitude vitesse)"}
+    fk_ns = field_ns_dropdown.value
+    fd_ns = fields_ns[fk_ns].reshape(n_grid_ns, n_grid_ns)
+    cm_ns = cmap_ns_dropdown.value
+
+    fig_ns, axes_ns = plt.subplots(1, 2, figsize=(13, 5))
+
+    _re_val = 1.0 / nu_v
+    im_ns1 = axes_ns[0].contourf(xi_ns, yi_ns, fd_ns, levels=30, cmap=cm_ns)
+    plt.colorbar(im_ns1, ax=axes_ns[0], shrink=0.8)
+    axes_ns[0].set_title(f"{labels_ns[fk_ns]} — Re={_re_val:.1f}")
+    axes_ns[0].set_xlabel("x")
+    axes_ns[0].set_ylabel("y")
+    axes_ns[0].set_aspect("equal")
+
+    ux_g_ns = ux_ns_pred.reshape(n_grid_ns, n_grid_ns)
+    uy_g_ns = uy_ns_pred.reshape(n_grid_ns, n_grid_ns)
+    speed_g_ns = np.sqrt(ux_g_ns**2 + uy_g_ns**2)
+    im_ns2 = axes_ns[1].contourf(xi_ns, yi_ns, speed_g_ns, levels=30, cmap="viridis")
+    plt.colorbar(im_ns2, ax=axes_ns[1], shrink=0.8, label="|u|")
+    _skip = 3
+    axes_ns[1].quiver(
+        xi_ns[::_skip, ::_skip], yi_ns[::_skip, ::_skip],
+        ux_g_ns[::_skip, ::_skip], uy_g_ns[::_skip, ::_skip],
+        color="white", alpha=0.7, scale=20,
+    )
+    axes_ns[1].set_title(f"Champ de vitesse — Re={_re_val:.1f}")
+    axes_ns[1].set_xlabel("x")
+    axes_ns[1].set_ylabel("y")
+    axes_ns[1].set_aspect("equal")
+    plt.tight_layout()
+
+    mo.center(fig_ns)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## Spectre POD — Navier-Stokes vs Stokes
+
+    Le spectre N-S décroît **plus lentement** que celui de Stokes : la non-linéarité
+    enrichit la dynamique et requiert plus de modes pour capturer l'énergie.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(UX_ns, k_ns, np, plt, mo):
+    _mean_ns = UX_ns.mean(axis=0)
+    _Uc_ns = UX_ns - _mean_ns
+    _, _s_ns, _ = np.linalg.svd(_Uc_ns, full_matrices=False)
+    _ecum_ns = np.cumsum(_s_ns**2) / (_s_ns**2).sum()
+
+    fig_spec_ns, (ax_sp_ns1, ax_sp_ns2) = plt.subplots(1, 2, figsize=(12, 4))
+
+    ax_sp_ns1.semilogy(range(1, len(_s_ns) + 1), _s_ns, "ko-", markersize=4)
+    ax_sp_ns1.axvline(x=k_ns, color="red", linestyle="--", label=f"k={k_ns}")
+    ax_sp_ns1.set_xlabel("Mode index")
+    ax_sp_ns1.set_ylabel("Valeur singulière σ")
+    ax_sp_ns1.set_title("Spectre N-S (ux)")
+    ax_sp_ns1.legend()
+    ax_sp_ns1.grid(True, alpha=0.3)
+
+    ax_sp_ns2.plot(range(1, len(_ecum_ns) + 1), _ecum_ns * 100, "b-o", markersize=4)
+    ax_sp_ns2.axvline(x=k_ns, color="red", linestyle="--", label=f"k={k_ns}")
+    ax_sp_ns2.axhline(y=99.9, color="gray", linestyle=":", alpha=0.5, label="99.9%")
+    ax_sp_ns2.set_xlabel("Nombre de modes")
+    ax_sp_ns2.set_ylabel("Énergie cumulée (%)")
+    ax_sp_ns2.set_title("Énergie cumulée N-S")
+    ax_sp_ns2.set_ylim([0, 101])
+    ax_sp_ns2.legend()
+    ax_sp_ns2.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    mo.center(fig_spec_ns)
+    return
+
+
 if __name__ == "__main__":
     app.run()

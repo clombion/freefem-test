@@ -1,5 +1,6 @@
 # Dataset files (large, generated)
 data/snapshots/
+data/snapshots_ns/
 data/*.png
 data/*.npy
 
