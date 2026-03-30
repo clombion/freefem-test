@@ -162,25 +162,6 @@ def _(e_p, e_ux, e_uy, k, degree, mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md("""
-    ## Exploration interactive
-
-    - **ν petit** (→ 0.005) : écoulement vigoureux, gradients forts
-    - **ν grand** (→ 2.0) : écoulement amorti, champs lisses
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo, nu_all):
-    nu_slider = mo.ui.slider(
-        start=float(nu_all.min()),
-        stop=float(nu_all.max()),
-        value=0.1,
-        step=0.001,
-        label="ν (viscosité cinématique)",
-        full_width=True,
-    )
     field_dropdown = mo.ui.dropdown(
         options={"Vitesse horizontale (ux)": "ux", "Vitesse verticale (uy)": "uy",
                  "Pression (p)": "p", "Magnitude vitesse (|u|)": "speed"},
@@ -192,33 +173,23 @@ def _(mo, nu_all):
         value="viridis",
         label="Colormap",
     )
-    mo.vstack([
-        nu_slider,
-        mo.hstack([field_dropdown, cmap_dropdown], gap=2),
-    ])
-    return nu_slider, field_dropdown, cmap_dropdown
+    mo.hstack([field_dropdown, cmap_dropdown], gap=2)
+    return field_dropdown, cmap_dropdown
 
 
 @app.cell
 def _(
-    predict_field, np, nu_slider,
+    predict_field, np,
     mean_ux, modes_ux, pipe_ux,
     mean_uy, modes_uy, pipe_uy,
     mean_p, modes_p, pipe_p,
 ):
-    nu = nu_slider.value
+    nu = 0.1
     ux_pred = predict_field(np.array([nu]), mean_ux, modes_ux, pipe_ux)[0]
     uy_pred = predict_field(np.array([nu]), mean_uy, modes_uy, pipe_uy)[0]
     p_pred = predict_field(np.array([nu]), mean_p, modes_p, pipe_p)[0]
     speed_pred = np.sqrt(ux_pred**2 + uy_pred**2)
     return nu, ux_pred, uy_pred, p_pred, speed_pred
-
-
-@app.cell(hide_code=True)
-def _(mo, nu, np, speed_pred):
-    max_speed = float(np.max(speed_pred))
-    mo.md(f"### ν = {nu:.4f} — max |u| = {max_speed:.4f}")
-    return
 
 
 @app.cell(hide_code=True)
@@ -422,39 +393,6 @@ def _(X, Y, UX, UY, n_grid, nu, nu_all, np, ux_pred, uy_pred, plt, mo):
     plt.suptitle(f"Comparaison: surrogate (ν={nu:.4f}) vs simulation (ν={nu_closest:.4f})")
     plt.tight_layout()
     mo.center(fig_cmp)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md("""
-    ## Validation globale
-
-    max|u| vs ν sur tout le dataset. Les points sont les simulations FreeFEM,
-    la courbe est le surrogate.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(UX, UY, mean_ux, mean_uy, modes_ux, modes_uy, np, nu_all,
-      pipe_ux, pipe_uy, plt, predict_field, mo):
-    nu_sweep = np.logspace(np.log10(nu_all.min()), np.log10(nu_all.max()), 200)
-    ux_sw = predict_field(nu_sweep, mean_ux, modes_ux, pipe_ux)
-    uy_sw = predict_field(nu_sweep, mean_uy, modes_uy, pipe_uy)
-    max_u_sweep = np.max(np.sqrt(ux_sw**2 + uy_sw**2), axis=1)
-    max_u_data = np.max(np.sqrt(UX**2 + UY**2), axis=1)
-
-    fig_val, ax_val = plt.subplots(figsize=(8, 4))
-    ax_val.loglog(nu_all, max_u_data, "o", markersize=5, label="Simulations FreeFEM")
-    ax_val.loglog(nu_sweep, max_u_sweep, "-", linewidth=2, label="Surrogate POD")
-    ax_val.set_xlabel("ν (viscosité cinématique)")
-    ax_val.set_ylabel("max |u|")
-    ax_val.set_title("Validation : max |u| vs ν")
-    ax_val.legend()
-    ax_val.grid(True, which="both", alpha=0.3)
-    plt.tight_layout()
-    mo.center(fig_val)
     return
 
 
