@@ -93,14 +93,15 @@ async def _(np):
 
     _url = "https://raw.githubusercontent.com/clombion/freefem-test/main/data/dataset.npz"
     try:
-        from pyodide.http import pyfetch
-        _resp = await pyfetch(_url)
-        _bytes = await _resp.bytes()
+        from js import fetch
+        _resp = await fetch(_url)
+        _abuf = await _resp.arrayBuffer()
+        _bytes = _abuf.to_py().tobytes()
     except ImportError:
         import urllib.request
         with urllib.request.urlopen(_url) as _r:
             _bytes = _r.read()
-    data = np.load(io.BytesIO(_bytes), allow_pickle=True)
+    data = np.load(io.BytesIO(_bytes))
     nu_all = data["nu_values"]
     X, Y = data["X"], data["Y"]
     UX, UY, P = data["UX"], data["UY"], data["P"]
