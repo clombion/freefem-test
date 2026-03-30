@@ -89,19 +89,21 @@ def _(mo):
 
 @app.cell
 async def _(np):
-    import io
+    import sys
 
     _url = "https://raw.githubusercontent.com/clombion/freefem-test/main/data/dataset.npz"
-    try:
-        from js import fetch
-        _resp = await fetch(_url)
-        _abuf = await _resp.arrayBuffer()
-        _bytes = _abuf.to_py().tobytes()
-    except ImportError:
-        import urllib.request
-        with urllib.request.urlopen(_url) as _r:
-            _bytes = _r.read()
-    data = np.load(io.BytesIO(_bytes), allow_pickle=True)
+
+    if "pyodide" in sys.modules:
+        from pyodide.http import pyfetch
+        _resp = await pyfetch(_url)
+        if _resp.status != 200:
+            raise RuntimeError(f"Failed to fetch dataset: HTTP {_resp.status}")
+        with open("/tmp/dataset.npz", "wb") as _f:
+            _f.write(await _resp.bytes())
+        data = np.load("/tmp/dataset.npz")
+    else:
+        data = np.load("data/dataset.npz")
+
     nu_all = data["nu_values"]
     X, Y = data["X"], data["Y"]
     UX, UY, P = data["UX"], data["UY"], data["P"]

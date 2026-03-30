@@ -1,7 +1,7 @@
 # Dataset files (large, generated)
 data/snapshots/
-data/dataset.npz
 data/*.png
+data/*.npy
 
 # Python
 .venv/
