@@ -1,8 +1,9 @@
-# Dataset files (large, generated)
+# Generated simulation outputs
 data/snapshots/
 data/snapshots_ns/
 data/*.png
 data/*.npy
+data/*.npz
 
 # Python
 .venv/

@@ -7,6 +7,9 @@
 #     "scipy>=1.10",
 #     "matplotlib>=3.8",
 # ]
+#
+# [tool.marimo.display]
+# theme = "light"
 # ///
 
 import marimo
@@ -29,6 +32,16 @@ def _():
         LinAlgWarning, Pipeline, PolynomialFeatures, Ridge,
         make_pipeline, mo, np, plt, warnings,
     )
+
+
+@app.cell(hide_code=True)
+def _(mo, plt):
+    _theme = mo.app_meta().theme
+    if _theme == "dark":
+        plt.style.use("dark_background")
+    else:
+        plt.style.use("default")
+    return
 
 
 @app.cell(hide_code=True)
@@ -88,13 +101,12 @@ def _(mo):
 
 
 @app.cell
-async def _(np):
+async def _(mo, np):
     import sys
-
-    _url = "https://raw.githubusercontent.com/clombion/freefem-test/main/data/dataset.npz"
 
     if "pyodide" in sys.modules:
         from pyodide.http import pyfetch
+        _url = str(mo.notebook_location()) + "public/dataset.npz"
         _resp = await pyfetch(_url)
         if _resp.status != 200:
             raise RuntimeError(f"Failed to fetch dataset: HTTP {_resp.status}")
@@ -102,7 +114,7 @@ async def _(np):
             _f.write(await _resp.bytes())
         data = np.load("/tmp/dataset.npz")
     else:
-        data = np.load("data/dataset.npz")
+        data = np.load("public/dataset.npz")
 
     nu_all = data["nu_values"]
     X, Y = data["X"], data["Y"]
@@ -444,13 +456,12 @@ def _(mo):
 
 
 @app.cell
-async def _(np):
+async def _(mo, np):
     import sys as _sys
-
-    _url_ns = "https://raw.githubusercontent.com/clombion/freefem-test/main/data/dataset_ns.npz"
 
     if "pyodide" in _sys.modules:
         from pyodide.http import pyfetch as _pyfetch
+        _url_ns = str(mo.notebook_location()) + "public/dataset_ns.npz"
         _resp_ns = await _pyfetch(_url_ns)
         if _resp_ns.status != 200:
             raise RuntimeError(f"Failed to fetch N-S dataset: HTTP {_resp_ns.status}")
@@ -458,7 +469,7 @@ async def _(np):
             _f.write(await _resp_ns.bytes())
         data_ns = np.load("/tmp/dataset_ns.npz")
     else:
-        data_ns = np.load("data/dataset_ns.npz")
+        data_ns = np.load("public/dataset_ns.npz")
 
     nu_ns = data_ns["nu_values"]
     X_ns, Y_ns = data_ns["X"], data_ns["Y"]
