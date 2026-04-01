@@ -106,7 +106,7 @@ async def _(mo, np):
 
     if "pyodide" in sys.modules:
         from pyodide.http import pyfetch
-        _url = str(mo.notebook_location()) + "public/dataset.npz"
+        _url = str(mo.notebook_location()).rstrip("/") + "/public/dataset.npz"
         _resp = await pyfetch(_url)
         if _resp.status != 200:
             raise RuntimeError(f"Failed to fetch dataset: HTTP {_resp.status}")
@@ -461,7 +461,7 @@ async def _(mo, np):
 
     if "pyodide" in _sys.modules:
         from pyodide.http import pyfetch as _pyfetch
-        _url_ns = str(mo.notebook_location()) + "public/dataset_ns.npz"
+        _url_ns = str(mo.notebook_location()).rstrip("/") + "/public/dataset_ns.npz"
         _resp_ns = await _pyfetch(_url_ns)
         if _resp_ns.status != 200:
             raise RuntimeError(f"Failed to fetch N-S dataset: HTTP {_resp_ns.status}")
