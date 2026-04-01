@@ -76,7 +76,7 @@ def _(LinAlgWarning, Pipeline, PolynomialFeatures, Ridge, make_pipeline, np, war
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md("""
+    mo.md(r"""
     # Surrogate POD — Stokes en cavité entraînée
 
     ## Le problème physique
@@ -87,7 +87,7 @@ def _(mo):
 
     Les équations de Stokes (régime lent, sans inertie) s'écrivent :
 
-    $$-\\nu \\, \\Delta \\mathbf{u} + \\nabla p = 0, \\quad \\nabla \\cdot \\mathbf{u} = 0$$
+    $$-\nu \, \Delta \mathbf{u} + \nabla p = 0, \quad \nabla \cdot \mathbf{u} = 0$$
 
     ## L'approche surrogate
 
@@ -435,15 +435,15 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md("""
+    mo.md(r"""
     ---
 
     # Partie 2 : Navier-Stokes — le rôle de la viscosité
 
-    En ajoutant le terme convectif $(\\mathbf{u} \\cdot \\nabla)\\mathbf{u}$, on passe
+    En ajoutant le terme convectif $(\mathbf{u} \cdot \nabla)\mathbf{u}$, on passe
     aux **équations de Navier-Stokes** :
 
-    $$(\\mathbf{u} \\cdot \\nabla)\\mathbf{u} - \\nu \\, \\Delta \\mathbf{u} + \\nabla p = 0, \\quad \\nabla \\cdot \\mathbf{u} = 0$$
+    $$(\mathbf{u} \cdot \nabla)\mathbf{u} - \nu \, \Delta \mathbf{u} + \nabla p = 0, \quad \nabla \cdot \mathbf{u} = 0$$
 
     La non-linéarité fait que le champ de vitesse **dépend du nombre de Reynolds**
     Re = UL/ν. À bas Re (ν grand), on retrouve Stokes. À Re élevé (ν petit),
