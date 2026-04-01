@@ -29,11 +29,9 @@ def _():
     from sklearn.linear_model import Ridge
     from sklearn.pipeline import make_pipeline, Pipeline
     from scipy.linalg import LinAlgWarning
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
     return (
         LinAlgWarning, Pipeline, PolynomialFeatures, Ridge,
-        go, make_subplots, make_pipeline, mo, np, plt, warnings,
+        make_pipeline, mo, np, plt, warnings,
     )
 
 
@@ -209,7 +207,10 @@ def _(
 
 @app.cell(hide_code=True)
 def _(X, Y, n_grid, nu, ux_pred, uy_pred, p_pred, speed_pred,
-      field_dropdown, cmap_dropdown, np, mo, go, make_subplots):
+      field_dropdown, cmap_dropdown, np, mo):
+    import plotly.graph_objects as _go
+    from plotly.subplots import make_subplots as _make_subplots
+
     xi = X.reshape(n_grid, n_grid)
     yi = Y.reshape(n_grid, n_grid)
 
@@ -222,18 +223,18 @@ def _(X, Y, n_grid, nu, ux_pred, uy_pred, p_pred, speed_pred,
 
     speed_g = np.sqrt(ux_pred**2 + uy_pred**2).reshape(n_grid, n_grid)
 
-    fig_main = make_subplots(rows=1, cols=2,
-                             subplot_titles=[f"{labels[field_key]} — ν={nu:.4f}",
-                                             f"Champ de vitesse — ν={nu:.4f}"])
+    fig_main = _make_subplots(rows=1, cols=2,
+                              subplot_titles=[f"{labels[field_key]} — ν={nu:.4f}",
+                                              f"Champ de vitesse — ν={nu:.4f}"])
 
-    fig_main.add_trace(go.Contour(
+    fig_main.add_trace(_go.Contour(
         x=xi[0, :], y=yi[:, 0], z=field_data,
         colorscale=cmap, ncontours=30,
         colorbar=dict(x=0.45, len=0.8),
         hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>value=%{z:.4f}<extra></extra>",
     ), row=1, col=1)
 
-    fig_main.add_trace(go.Contour(
+    fig_main.add_trace(_go.Contour(
         x=xi[0, :], y=yi[:, 0], z=speed_g,
         colorscale="Viridis", ncontours=30,
         colorbar=dict(x=1.0, len=0.8, title="|u|"),
@@ -244,7 +245,7 @@ def _(X, Y, n_grid, nu, ux_pred, uy_pred, p_pred, speed_pred,
     fig_main.update_xaxes(title_text="x", scaleanchor="y", scaleratio=1)
     fig_main.update_yaxes(title_text="y")
 
-    mo.output.replace(fig_main)
+    mo.center(fig_main)
     return
 
 
@@ -590,7 +591,10 @@ def _(mo, nu_v, np, speed_ns_pred):
 
 @app.cell(hide_code=True)
 def _(X_ns, Y_ns, n_grid_ns, nu_v, ux_ns_pred, uy_ns_pred, p_ns_pred, speed_ns_pred,
-      field_ns_dropdown, cmap_ns_dropdown, np, mo, go, make_subplots):
+      field_ns_dropdown, cmap_ns_dropdown, np, mo):
+    import plotly.graph_objects as _go
+    from plotly.subplots import make_subplots as _make_subplots
+
     xi_ns = X_ns.reshape(n_grid_ns, n_grid_ns)
     yi_ns = Y_ns.reshape(n_grid_ns, n_grid_ns)
 
@@ -603,11 +607,11 @@ def _(X_ns, Y_ns, n_grid_ns, nu_v, ux_ns_pred, uy_ns_pred, p_ns_pred, speed_ns_p
 
     _re_val = 1.0 / nu_v
 
-    fig_ns = make_subplots(rows=1, cols=2,
-                           subplot_titles=[f"{labels_ns[fk_ns]} — Re={_re_val:.1f}",
-                                           f"Champ de vitesse — Re={_re_val:.1f}"])
+    fig_ns = _make_subplots(rows=1, cols=2,
+                            subplot_titles=[f"{labels_ns[fk_ns]} — Re={_re_val:.1f}",
+                                            f"Champ de vitesse — Re={_re_val:.1f}"])
 
-    fig_ns.add_trace(go.Contour(
+    fig_ns.add_trace(_go.Contour(
         x=xi_ns[0, :], y=yi_ns[:, 0], z=fd_ns,
         colorscale=cm_ns, ncontours=30,
         colorbar=dict(x=0.45, len=0.8),
@@ -615,7 +619,7 @@ def _(X_ns, Y_ns, n_grid_ns, nu_v, ux_ns_pred, uy_ns_pred, p_ns_pred, speed_ns_p
     ), row=1, col=1)
 
     speed_g_ns = np.sqrt(ux_ns_pred**2 + uy_ns_pred**2).reshape(n_grid_ns, n_grid_ns)
-    fig_ns.add_trace(go.Contour(
+    fig_ns.add_trace(_go.Contour(
         x=xi_ns[0, :], y=yi_ns[:, 0], z=speed_g_ns,
         colorscale="Viridis", ncontours=30,
         colorbar=dict(x=1.0, len=0.8, title="|u|"),
@@ -629,7 +633,7 @@ def _(X_ns, Y_ns, n_grid_ns, nu_v, ux_ns_pred, uy_ns_pred, p_ns_pred, speed_ns_p
     fig_ns.update_xaxes(title_text="x", scaleanchor="y", scaleratio=1)
     fig_ns.update_yaxes(title_text="y")
 
-    mo.output.replace(fig_ns)
+    mo.center(fig_ns)
     return
 
 
