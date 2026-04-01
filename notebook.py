@@ -244,7 +244,8 @@ def _(X, Y, n_grid, nu, ux_pred, uy_pred, p_pred, speed_pred,
     fig_main.update_xaxes(title_text="x", scaleanchor="y", scaleratio=1)
     fig_main.update_yaxes(title_text="y")
 
-    return fig_main
+    mo.output.replace(fig_main)
+    return
 
 
 @app.cell(hide_code=True)
@@ -628,7 +629,8 @@ def _(X_ns, Y_ns, n_grid_ns, nu_v, ux_ns_pred, uy_ns_pred, p_ns_pred, speed_ns_p
     fig_ns.update_xaxes(title_text="x", scaleanchor="y", scaleratio=1)
     fig_ns.update_yaxes(title_text="y")
 
-    return fig_ns
+    mo.output.replace(fig_ns)
+    return
 
 
 @app.cell(hide_code=True)
