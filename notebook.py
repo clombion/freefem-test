@@ -245,7 +245,7 @@ def _(X, Y, n_grid, nu, ux_pred, uy_pred, p_pred, speed_pred,
     axes_main[1].set_aspect("equal")
     plt.tight_layout()
 
-    mo.center(fig_main)
+    mo.mpl.interactive(fig_main)
     return
 
 
@@ -300,7 +300,7 @@ def _(X, Y, n_grid, nu, ux_pred, uy_pred, np, plt, mo):
     ax_cl2.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    mo.center(fig_cl)
+    mo.mpl.interactive(fig_cl)
     return
 
 
@@ -348,7 +348,7 @@ def _(UX, k, np, plt, mo):
     ax_sp2.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    mo.center(fig_spec)
+    mo.mpl.interactive(fig_spec)
     return
 
 
@@ -404,7 +404,7 @@ def _(X, Y, UX, UY, n_grid, nu, nu_all, np, ux_pred, uy_pred, plt, mo):
 
     plt.suptitle(f"Comparaison: surrogate (ν={nu:.4f}) vs simulation (ν={nu_closest:.4f})")
     plt.tight_layout()
-    mo.center(fig_cmp)
+    mo.mpl.interactive(fig_cmp)
     return
 
 
@@ -626,7 +626,7 @@ def _(X_ns, Y_ns, n_grid_ns, nu_v, ux_ns_pred, uy_ns_pred, p_ns_pred, speed_ns_p
     axes_ns[1].set_aspect("equal")
     plt.tight_layout()
 
-    mo.center(fig_ns)
+    mo.mpl.interactive(fig_ns)
     return
 
 
@@ -669,7 +669,7 @@ def _(UX_ns, k_ns, np, plt, mo):
     ax_sp_ns2.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    mo.center(fig_spec_ns)
+    mo.mpl.interactive(fig_spec_ns)
     return
 
 
