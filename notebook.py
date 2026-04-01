@@ -6,6 +6,7 @@
 #     "scikit-learn>=1.4",
 #     "scipy>=1.10",
 #     "matplotlib>=3.8",
+#     "plotly>=5.0",
 # ]
 #
 # [tool.marimo.display]
@@ -245,7 +246,7 @@ def _(X, Y, n_grid, nu, ux_pred, uy_pred, p_pred, speed_pred,
     axes_main[1].set_aspect("equal")
     plt.tight_layout()
 
-    mo.mpl.interactive(fig_main)
+    mo.center(fig_main)
     return
 
 
@@ -300,7 +301,7 @@ def _(X, Y, n_grid, nu, ux_pred, uy_pred, np, plt, mo):
     ax_cl2.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    mo.mpl.interactive(fig_cl)
+    mo.center(fig_cl)
     return
 
 
@@ -348,7 +349,7 @@ def _(UX, k, np, plt, mo):
     ax_sp2.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    mo.mpl.interactive(fig_spec)
+    mo.center(fig_spec)
     return
 
 
@@ -404,7 +405,7 @@ def _(X, Y, UX, UY, n_grid, nu, nu_all, np, ux_pred, uy_pred, plt, mo):
 
     plt.suptitle(f"Comparaison: surrogate (ν={nu:.4f}) vs simulation (ν={nu_closest:.4f})")
     plt.tight_layout()
-    mo.mpl.interactive(fig_cmp)
+    mo.center(fig_cmp)
     return
 
 
@@ -588,7 +589,10 @@ def _(mo, nu_v, np, speed_ns_pred):
 
 @app.cell(hide_code=True)
 def _(X_ns, Y_ns, n_grid_ns, nu_v, ux_ns_pred, uy_ns_pred, p_ns_pred, speed_ns_pred,
-      field_ns_dropdown, cmap_ns_dropdown, np, plt, mo):
+      field_ns_dropdown, cmap_ns_dropdown, np, mo):
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+
     xi_ns = X_ns.reshape(n_grid_ns, n_grid_ns)
     yi_ns = Y_ns.reshape(n_grid_ns, n_grid_ns)
 
@@ -599,34 +603,35 @@ def _(X_ns, Y_ns, n_grid_ns, nu_v, ux_ns_pred, uy_ns_pred, p_ns_pred, speed_ns_p
     fd_ns = fields_ns[fk_ns].reshape(n_grid_ns, n_grid_ns)
     cm_ns = cmap_ns_dropdown.value
 
-    fig_ns, axes_ns = plt.subplots(1, 2, figsize=(13, 5))
-
     _re_val = 1.0 / nu_v
-    im_ns1 = axes_ns[0].contourf(xi_ns, yi_ns, fd_ns, levels=30, cmap=cm_ns)
-    plt.colorbar(im_ns1, ax=axes_ns[0], shrink=0.8)
-    axes_ns[0].set_title(f"{labels_ns[fk_ns]} — Re={_re_val:.1f}")
-    axes_ns[0].set_xlabel("x")
-    axes_ns[0].set_ylabel("y")
-    axes_ns[0].set_aspect("equal")
 
-    ux_g_ns = ux_ns_pred.reshape(n_grid_ns, n_grid_ns)
-    uy_g_ns = uy_ns_pred.reshape(n_grid_ns, n_grid_ns)
-    speed_g_ns = np.sqrt(ux_g_ns**2 + uy_g_ns**2)
-    im_ns2 = axes_ns[1].contourf(xi_ns, yi_ns, speed_g_ns, levels=30, cmap="viridis")
-    plt.colorbar(im_ns2, ax=axes_ns[1], shrink=0.8, label="|u|")
-    _skip = 3
-    axes_ns[1].quiver(
-        xi_ns[::_skip, ::_skip], yi_ns[::_skip, ::_skip],
-        ux_g_ns[::_skip, ::_skip], uy_g_ns[::_skip, ::_skip],
-        color="white", alpha=0.7, scale=20,
+    fig_ns = make_subplots(rows=1, cols=2,
+                           subplot_titles=[f"{labels_ns[fk_ns]} — Re={_re_val:.1f}",
+                                           f"Champ de vitesse — Re={_re_val:.1f}"])
+
+    fig_ns.add_trace(go.Contour(
+        x=xi_ns[0, :], y=yi_ns[:, 0], z=fd_ns,
+        colorscale=cm_ns, ncontours=30,
+        colorbar=dict(x=0.45, len=0.8),
+        hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>value=%{z:.4f}<extra></extra>",
+    ), row=1, col=1)
+
+    speed_g_ns = np.sqrt(ux_ns_pred**2 + uy_ns_pred**2).reshape(n_grid_ns, n_grid_ns)
+    fig_ns.add_trace(go.Contour(
+        x=xi_ns[0, :], y=yi_ns[:, 0], z=speed_g_ns,
+        colorscale="Viridis", ncontours=30,
+        colorbar=dict(x=1.0, len=0.8, title="|u|"),
+        hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>|u|=%{z:.4f}<extra></extra>",
+    ), row=1, col=2)
+
+    fig_ns.update_layout(
+        height=500, width=1000,
+        margin=dict(l=50, r=50, t=50, b=50),
     )
-    axes_ns[1].set_title(f"Champ de vitesse — Re={_re_val:.1f}")
-    axes_ns[1].set_xlabel("x")
-    axes_ns[1].set_ylabel("y")
-    axes_ns[1].set_aspect("equal")
-    plt.tight_layout()
+    fig_ns.update_xaxes(title_text="x", scaleanchor="y", scaleratio=1)
+    fig_ns.update_yaxes(title_text="y")
 
-    mo.mpl.interactive(fig_ns)
+    mo.center(fig_ns)
     return
 
 
@@ -669,7 +674,7 @@ def _(UX_ns, k_ns, np, plt, mo):
     ax_sp_ns2.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    mo.mpl.interactive(fig_spec_ns)
+    mo.center(fig_spec_ns)
     return
 
 
