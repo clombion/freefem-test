@@ -138,7 +138,7 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    k_slider = mo.ui.slider(start=1, stop=20, value=5, step=1, label="k (modes POD)")
+    k_slider = mo.ui.slider(start=2, stop=20, value=5, step=1, label="k (modes POD)")
     deg_slider = mo.ui.slider(start=1, stop=6, value=3, step=1, label="Degré polynomial")
     mo.hstack([k_slider, deg_slider], gap=2)
     return k_slider, deg_slider
@@ -182,7 +182,7 @@ def _(mo):
         label="Champ à afficher",
     )
     cmap_dropdown = mo.ui.dropdown(
-        options=["viridis", "coolwarm", "plasma", "RdBu_r", "inferno", "cividis"],
+        options=["viridis", "RdBu", "plasma", "RdBu_r", "inferno", "cividis"],
         value="viridis",
         label="Colormap",
     )
@@ -207,7 +207,10 @@ def _(
 
 @app.cell(hide_code=True)
 def _(X, Y, n_grid, nu, ux_pred, uy_pred, p_pred, speed_pred,
-      field_dropdown, cmap_dropdown, np, plt, mo):
+      field_dropdown, cmap_dropdown, np, mo):
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+
     xi = X.reshape(n_grid, n_grid)
     yi = Y.reshape(n_grid, n_grid)
 
@@ -218,33 +221,29 @@ def _(X, Y, n_grid, nu, ux_pred, uy_pred, p_pred, speed_pred,
     field_data = fields[field_key].reshape(n_grid, n_grid)
     cmap = cmap_dropdown.value
 
-    fig_main, axes_main = plt.subplots(1, 2, figsize=(13, 5))
+    speed_g = np.sqrt(ux_pred**2 + uy_pred**2).reshape(n_grid, n_grid)
 
-    # Left: selected field contour
-    im1 = axes_main[0].contourf(xi, yi, field_data, levels=30, cmap=cmap)
-    plt.colorbar(im1, ax=axes_main[0], shrink=0.8)
-    axes_main[0].set_title(f"{labels[field_key]} — ν={nu:.4f}")
-    axes_main[0].set_xlabel("x")
-    axes_main[0].set_ylabel("y")
-    axes_main[0].set_aspect("equal")
+    fig_main = make_subplots(rows=1, cols=2,
+                             subplot_titles=[f"{labels[field_key]} — ν={nu:.4f}",
+                                             f"Champ de vitesse — ν={nu:.4f}"])
 
-    # Right: velocity vectors on speed background
-    ux_g = ux_pred.reshape(n_grid, n_grid)
-    uy_g = uy_pred.reshape(n_grid, n_grid)
-    speed_g = np.sqrt(ux_g**2 + uy_g**2)
-    im2 = axes_main[1].contourf(xi, yi, speed_g, levels=30, cmap="viridis")
-    plt.colorbar(im2, ax=axes_main[1], shrink=0.8, label="|u|")
-    skip = 3
-    axes_main[1].quiver(
-        xi[::skip, ::skip], yi[::skip, ::skip],
-        ux_g[::skip, ::skip], uy_g[::skip, ::skip],
-        color="white", alpha=0.7, scale=20,
-    )
-    axes_main[1].set_title(f"Champ de vitesse — ν={nu:.4f}")
-    axes_main[1].set_xlabel("x")
-    axes_main[1].set_ylabel("y")
-    axes_main[1].set_aspect("equal")
-    plt.tight_layout()
+    fig_main.add_trace(go.Contour(
+        x=xi[0, :], y=yi[:, 0], z=field_data,
+        colorscale=cmap, ncontours=30,
+        colorbar=dict(x=0.45, len=0.8),
+        hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>value=%{z:.4f}<extra></extra>",
+    ), row=1, col=1)
+
+    fig_main.add_trace(go.Contour(
+        x=xi[0, :], y=yi[:, 0], z=speed_g,
+        colorscale="Viridis", ncontours=30,
+        colorbar=dict(x=1.0, len=0.8, title="|u|"),
+        hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>|u|=%{z:.4f}<extra></extra>",
+    ), row=1, col=2)
+
+    fig_main.update_layout(height=500, width=1000, margin=dict(l=50, r=50, t=50, b=50))
+    fig_main.update_xaxes(title_text="x", scaleanchor="y", scaleratio=1)
+    fig_main.update_yaxes(title_text="y")
 
     mo.center(fig_main)
     return
@@ -489,7 +488,7 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    k_ns_slider = mo.ui.slider(start=1, stop=25, value=10, step=1, label="k (modes POD)")
+    k_ns_slider = mo.ui.slider(start=2, stop=25, value=10, step=1, label="k (modes POD)")
     deg_ns_slider = mo.ui.slider(start=1, stop=6, value=3, step=1, label="Degré polynomial")
     mo.hstack([k_ns_slider, deg_ns_slider], gap=2)
     return k_ns_slider, deg_ns_slider
@@ -526,12 +525,15 @@ def _(e_p_ns, e_ux_ns, e_uy_ns, k_ns, degree_ns, mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md("""
+    mo.md(r"""
     ## Exploration interactive — effet du Reynolds
 
     Contrairement à Stokes, ici **ν change réellement l'écoulement** :
-    - **Re ~ 1** (ν = 1.0) : écoulement quasi-Stokes, vortex centré
-    - **Re ~ 100** (ν = 0.01) : vortex décalé, recirculations dans les coins
+    - **Re $\approx$ 5** (ν = 0.2) : écoulement quasi-Stokes, vortex centré
+    - **Re $\approx$ 100** (ν = 0.01) : vortex décalé, recirculations dans les coins
+
+    Le slider couvre Re ∈ [5, 100] — en dessous de Re ≈ 5, l'écoulement
+    est indistinguable de Stokes (l'inertie est négligeable).
     """)
     return
 
@@ -540,10 +542,10 @@ def _(mo):
 def _(mo, nu_ns):
     nu_ns_slider = mo.ui.slider(
         start=float(nu_ns.min()),
-        stop=float(nu_ns.max()),
-        value=0.1,
+        stop=0.2,
+        value=0.05,
         step=0.001,
-        label="ν (viscosité cinématique)",
+        label="ν (viscosité cinématique) — Re = UL/ν",
         full_width=True,
     )
     field_ns_dropdown = mo.ui.dropdown(
@@ -553,7 +555,7 @@ def _(mo, nu_ns):
         label="Champ à afficher",
     )
     cmap_ns_dropdown = mo.ui.dropdown(
-        options=["viridis", "coolwarm", "plasma", "RdBu_r", "inferno", "cividis"],
+        options=["viridis", "RdBu", "plasma", "RdBu_r", "inferno", "cividis"],
         value="viridis",
         label="Colormap",
     )
