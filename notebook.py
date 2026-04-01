@@ -138,7 +138,7 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    k_slider = mo.ui.slider(start=2, stop=20, value=5, step=1, label="k (modes POD)")
+    k_slider = mo.ui.slider(start=1, stop=20, value=5, step=1, label="k (modes POD)")
     deg_slider = mo.ui.slider(start=1, stop=6, value=3, step=1, label="Degré polynomial")
     mo.hstack([k_slider, deg_slider], gap=2)
     return k_slider, deg_slider
@@ -227,16 +227,16 @@ def _(X, Y, n_grid, nu, ux_pred, uy_pred, p_pred, speed_pred,
                               subplot_titles=[f"{labels[field_key]} — ν={nu:.4f}",
                                               f"Champ de vitesse — ν={nu:.4f}"])
 
-    fig_main.add_trace(_go.Contour(
+    fig_main.add_trace(_go.Heatmap(
         x=xi[0, :], y=yi[:, 0], z=field_data,
-        colorscale=cmap, ncontours=30,
+        colorscale=cmap,
         colorbar=dict(x=0.45, len=0.8),
         hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>value=%{z:.4f}<extra></extra>",
     ), row=1, col=1)
 
-    fig_main.add_trace(_go.Contour(
+    fig_main.add_trace(_go.Heatmap(
         x=xi[0, :], y=yi[:, 0], z=speed_g,
-        colorscale="Viridis", ncontours=30,
+        colorscale="Viridis",
         colorbar=dict(x=1.0, len=0.8, title="|u|"),
         hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>|u|=%{z:.4f}<extra></extra>",
     ), row=1, col=2)
@@ -488,7 +488,7 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    k_ns_slider = mo.ui.slider(start=2, stop=25, value=10, step=1, label="k (modes POD)")
+    k_ns_slider = mo.ui.slider(start=1, stop=25, value=10, step=1, label="k (modes POD)")
     deg_ns_slider = mo.ui.slider(start=1, stop=6, value=3, step=1, label="Degré polynomial")
     mo.hstack([k_ns_slider, deg_ns_slider], gap=2)
     return k_ns_slider, deg_ns_slider
@@ -611,17 +611,17 @@ def _(X_ns, Y_ns, n_grid_ns, nu_v, ux_ns_pred, uy_ns_pred, p_ns_pred, speed_ns_p
                             subplot_titles=[f"{labels_ns[fk_ns]} — Re={_re_val:.1f}",
                                             f"Champ de vitesse — Re={_re_val:.1f}"])
 
-    fig_ns.add_trace(_go.Contour(
+    fig_ns.add_trace(_go.Heatmap(
         x=xi_ns[0, :], y=yi_ns[:, 0], z=fd_ns,
-        colorscale=cm_ns, ncontours=30,
+        colorscale=cm_ns,
         colorbar=dict(x=0.45, len=0.8),
         hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>value=%{z:.4f}<extra></extra>",
     ), row=1, col=1)
 
     speed_g_ns = np.sqrt(ux_ns_pred**2 + uy_ns_pred**2).reshape(n_grid_ns, n_grid_ns)
-    fig_ns.add_trace(_go.Contour(
+    fig_ns.add_trace(_go.Heatmap(
         x=xi_ns[0, :], y=yi_ns[:, 0], z=speed_g_ns,
-        colorscale="Viridis", ncontours=30,
+        colorscale="Viridis",
         colorbar=dict(x=1.0, len=0.8, title="|u|"),
         hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>|u|=%{z:.4f}<extra></extra>",
     ), row=1, col=2)
