@@ -29,9 +29,11 @@ def _():
     from sklearn.linear_model import Ridge
     from sklearn.pipeline import make_pipeline, Pipeline
     from scipy.linalg import LinAlgWarning
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
     return (
         LinAlgWarning, Pipeline, PolynomialFeatures, Ridge,
-        make_pipeline, mo, np, plt, warnings,
+        go, make_subplots, make_pipeline, mo, np, plt, warnings,
     )
 
 
@@ -207,10 +209,7 @@ def _(
 
 @app.cell(hide_code=True)
 def _(X, Y, n_grid, nu, ux_pred, uy_pred, p_pred, speed_pred,
-      field_dropdown, cmap_dropdown, np, mo):
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-
+      field_dropdown, cmap_dropdown, np, mo, go, make_subplots):
     xi = X.reshape(n_grid, n_grid)
     yi = Y.reshape(n_grid, n_grid)
 
@@ -591,10 +590,7 @@ def _(mo, nu_v, np, speed_ns_pred):
 
 @app.cell(hide_code=True)
 def _(X_ns, Y_ns, n_grid_ns, nu_v, ux_ns_pred, uy_ns_pred, p_ns_pred, speed_ns_pred,
-      field_ns_dropdown, cmap_ns_dropdown, np, mo):
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-
+      field_ns_dropdown, cmap_ns_dropdown, np, mo, go, make_subplots):
     xi_ns = X_ns.reshape(n_grid_ns, n_grid_ns)
     yi_ns = Y_ns.reshape(n_grid_ns, n_grid_ns)
 
